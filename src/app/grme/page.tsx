@@ -9,14 +9,45 @@ import {
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
+import { useGrmeUser, canEditFramework, canEnterData } from "@/lib/grme-user";
 import RadarChart from "@/components/RadarChart";
 import DataEntryForm from "@/components/DataEntryForm";
 import AuditPanel from "@/components/AuditPanel";
 import FrameworkEditor from "@/components/FrameworkEditor";
+import LoginScreen from "@/components/LoginScreen";
+import UserBadge from "@/components/UserBadge";
 
 type Tab = "dashboard" | "entry" | "framework" | "audit";
 
 export default function GRMEPage() {
+  const { user, loaded: userLoaded, login, logout, switchRole } = useGrmeUser();
+
+  // Show login screen if not logged in
+  if (userLoaded && !user) {
+    return <LoginScreen onLogin={login} />;
+  }
+
+  // Don't render until user is loaded
+  if (!user || !userLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center">
+        <div className="text-gray-400 text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  return <GRMEApp user={user} onSwitchRole={switchRole} onLogout={logout} />;
+}
+
+function GRMEApp({
+  user,
+  onSwitchRole,
+  onLogout,
+}: {
+  user: { name: string; role: "admin" | "editor" | "viewer"; loginAt: string };
+  onSwitchRole: (role: "admin" | "editor" | "viewer") => void;
+  onLogout: () => void;
+}) {
   const framework = useGRMEFramework();
 
   const {
@@ -28,7 +59,7 @@ export default function GRMEPage() {
     getDomainScore,
     getOverallScore,
     getDataEntryStats,
-  } = useGRMEData(framework.domains);
+  } = useGRMEData(framework.domains, user.name);
 
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [selectedDomain, setSelectedDomain] = useState<string>(
@@ -38,7 +69,6 @@ export default function GRMEPage() {
     framework.domains[0]?.subdomains[0]?.id || ""
   );
 
-  // Update selections when framework changes
   const currentDomain =
     framework.domains.find((d) => d.id === selectedDomain) ||
     framework.domains[0];
@@ -58,6 +88,9 @@ export default function GRMEPage() {
   const stats = getDataEntryStats();
   const overallStatus = getStatusFromScore(overallScore);
   const overallColor = getStatusColor(overallStatus);
+
+  const isAdmin = canEditFramework(user.role);
+  const canEdit = canEnterData(user.role);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
@@ -80,7 +113,7 @@ export default function GRMEPage() {
         </div>
       </section>
 
-      {/* City Selector + Stats Bar */}
+      {/* City Selector + Stats Bar + User Badge */}
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row items-center gap-4">
@@ -101,29 +134,36 @@ export default function GRMEPage() {
               </select>
             </div>
             <div className="flex-1" />
-            <div className="flex items-center gap-6 text-sm">
-              <div>
-                <span className="text-gray-400">Data Entry:</span>
-                <span
-                  className="ml-2 font-bold"
-                  style={{ color: overallColor }}
-                >
-                  {stats.filled}/{stats.total}
-                </span>
-                <span className="ml-1 text-gray-400">
-                  ({stats.percentage}%)
-                </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6 text-sm">
+                <div>
+                  <span className="text-gray-400">Data Entry:</span>
+                  <span
+                    className="ml-2 font-bold"
+                    style={{ color: overallColor }}
+                  >
+                    {stats.filled}/{stats.total}
+                  </span>
+                  <span className="ml-1 text-gray-400">
+                    ({stats.percentage}%)
+                  </span>
+                </div>
+                <div className="h-4 w-px bg-gray-200" />
+                <div>
+                  <span className="text-gray-400">Overall Score:</span>
+                  <span
+                    className="ml-2 text-xl font-bold"
+                    style={{ color: overallColor }}
+                  >
+                    {Math.round(overallScore)}
+                  </span>
+                </div>
               </div>
-              <div className="h-4 w-px bg-gray-200" />
-              <div>
-                <span className="text-gray-400">Overall Score:</span>
-                <span
-                  className="ml-2 text-xl font-bold"
-                  style={{ color: overallColor }}
-                >
-                  {Math.round(overallScore)}
-                </span>
-              </div>
+              <UserBadge
+                user={user}
+                onSwitchRole={onSwitchRole}
+                onLogout={onLogout}
+              />
             </div>
           </div>
         </div>
@@ -138,54 +178,60 @@ export default function GRMEPage() {
                 id: "dashboard",
                 label: "Dashboard",
                 icon: "M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z",
+                show: true,
               },
               {
                 id: "entry",
                 label: "Data Entry",
                 icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
+                show: canEdit,
               },
               {
                 id: "framework",
                 label: "Framework",
                 icon: "M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4",
+                show: isAdmin,
               },
               {
                 id: "audit",
                 label: "Audit Trail",
                 icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+                show: true,
               },
-            ] as const).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? "bg-primary text-white shadow-lg shadow-primary/25"
-                    : "bg-white text-gray-600 border border-gray-200 hover:border-primary/30"
-                }`}
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            ] as const)
+              .filter((t) => t.show)
+              .map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? "bg-primary text-white shadow-lg shadow-primary/25"
+                      : "bg-white text-gray-600 border border-gray-200 hover:border-primary/30"
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d={tab.icon}
-                  />
-                </svg>
-                {tab.label}
-                {tab.id === "framework" &&
-                  framework.pendingProposals.length > 0 && (
-                    <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {framework.pendingProposals.length}
-                    </span>
-                  )}
-              </button>
-            ))}
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d={tab.icon}
+                    />
+                  </svg>
+                  {tab.label}
+                  {tab.id === "framework" &&
+                    framework.pendingProposals.length > 0 && (
+                      <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {framework.pendingProposals.length}
+                      </span>
+                    )}
+                </button>
+              ))}
           </div>
         </div>
       </section>
@@ -195,7 +241,6 @@ export default function GRMEPage() {
         <section className="pb-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Radar Chart */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
                   Domain Profile
@@ -209,7 +254,6 @@ export default function GRMEPage() {
                 </div>
               </div>
 
-              {/* Domain Scores */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
                   Domain Scores
@@ -233,9 +277,13 @@ export default function GRMEPage() {
                         key={domain.id}
                         className="p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer"
                         onClick={() => {
-                          setSelectedDomain(domain.id);
-                          setSelectedSubdomain(domain.subdomains[0]?.id || "");
-                          setActiveTab("entry");
+                          if (canEdit) {
+                            setSelectedDomain(domain.id);
+                            setSelectedSubdomain(
+                              domain.subdomains[0]?.id || ""
+                            );
+                            setActiveTab("entry");
+                          }
                         }}
                       >
                         <div className="flex items-center justify-between mb-2">
@@ -279,9 +327,11 @@ export default function GRMEPage() {
                           >
                             {status}
                           </span>
-                          <span className="text-[10px] text-gray-400">
-                            Click to enter data →
-                          </span>
+                          {canEdit && (
+                            <span className="text-[10px] text-gray-400">
+                              Click to enter data →
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -290,7 +340,6 @@ export default function GRMEPage() {
               </div>
             </div>
 
-            {/* Quick Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center">
                 <div className="text-3xl font-bold gradient-text mb-1">
@@ -324,11 +373,10 @@ export default function GRMEPage() {
       )}
 
       {/* Data Entry Tab */}
-      {activeTab === "entry" && (
+      {activeTab === "entry" && canEdit && (
         <section className="pb-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Domain/Subdomain Navigation */}
               <div className="lg:col-span-1">
                 <div className="sticky top-24 space-y-4">
                   <div>
@@ -408,24 +456,6 @@ export default function GRMEPage() {
                             (i) =>
                               cityData.indicators[i.id]?.value !== undefined
                           ).length;
-                          const subScore =
-                            subIndicators.length > 0
-                              ? (subIndicators.reduce((sum, ind) => {
-                                  const data = cityData.indicators[ind.id];
-                                  if (
-                                    data &&
-                                    typeof data.value === "number"
-                                  ) {
-                                    const indicatorScore =
-                                      getDomainScore(currentDomain.id);
-                                    return sum + indicatorScore;
-                                  }
-                                  return sum + 50;
-                                }, 0) /
-                                  subIndicators.length)
-                              : 50;
-                          const subStatus = getStatusFromScore(subScore);
-                          const color = getStatusColor(subStatus);
 
                           return (
                             <button
@@ -441,10 +471,7 @@ export default function GRMEPage() {
                                 <span className="font-medium text-gray-700 truncate">
                                   {sub.name}
                                 </span>
-                                <span
-                                  className="font-bold ml-2"
-                                  style={{ color }}
-                                >
+                                <span className="font-bold ml-2 text-gray-500">
                                   {filledCount}/{subIndicators.length}
                                 </span>
                               </div>
@@ -453,7 +480,7 @@ export default function GRMEPage() {
                                   className="h-full rounded-full"
                                   style={{
                                     width: `${subIndicators.length > 0 ? (filledCount / subIndicators.length) * 100 : 0}%`,
-                                    backgroundColor: color,
+                                    backgroundColor: "#6366f1",
                                   }}
                                 />
                               </div>
@@ -466,7 +493,6 @@ export default function GRMEPage() {
                 </div>
               </div>
 
-              {/* Indicator Forms */}
               <div className="lg:col-span-2">
                 <div className="mb-4">
                   <h3 className="text-lg font-bold text-gray-900">
@@ -497,8 +523,8 @@ export default function GRMEPage() {
         </section>
       )}
 
-      {/* Framework Tab */}
-      {activeTab === "framework" && (
+      {/* Framework Tab (Admin only) */}
+      {activeTab === "framework" && isAdmin && (
         <section className="pb-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <FrameworkEditor

@@ -12,7 +12,6 @@ import {
 } from "./grme-data";
 
 const STORAGE_KEY = "grme-data";
-const CURRENT_USER = "Stakeholder";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -46,11 +45,12 @@ function findIndicatorInDomains(
   return null;
 }
 
-export function useGRMEData(domains: Domain[]) {
+export function useGRMEData(domains: Domain[], userName?: string) {
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
   const domainsRef = useRef(domains);
   domainsRef.current = domains;
+  const currentUser = userName || "Stakeholder";
 
   useEffect(() => {
     setAllData(loadAllData());
@@ -72,7 +72,7 @@ export function useGRMEData(domains: Domain[]) {
       const auditEntry: AuditEntry = {
         id: generateId(),
         timestamp: new Date().toISOString(),
-        user: CURRENT_USER,
+        user: currentUser,
         action: existing ? "update" : "create",
         field: "value",
         oldValue:
@@ -86,7 +86,7 @@ export function useGRMEData(domains: Domain[]) {
         value,
         notes,
         lastUpdated: new Date().toISOString(),
-        updatedBy: CURRENT_USER,
+        updatedBy: currentUser,
       };
 
       const existingAudit = cityData.auditLog.find(
@@ -132,7 +132,7 @@ export function useGRMEData(domains: Domain[]) {
       const auditEntry: AuditEntry = {
         id: generateId(),
         timestamp: new Date().toISOString(),
-        user: CURRENT_USER,
+        user: currentUser,
         action: "review",
         field: "notes",
         newValue: note,
