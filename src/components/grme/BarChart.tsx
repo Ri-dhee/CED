@@ -8,6 +8,11 @@ interface BarChartProps {
   getDomainScore: (domainId: string) => number;
   comparisonDomainScores?: Record<string, number> | null;
   comparisonLabel?: string;
+  comparisonSeries?: Array<{
+    label: string;
+    scores: Record<string, number>;
+    color: string;
+  }> | null;
   onDomainClick?: (domainId: string) => void;
 }
 
@@ -16,6 +21,7 @@ export default function BarChart({
   getDomainScore,
   comparisonDomainScores = null,
   comparisonLabel,
+  comparisonSeries = null,
   onDomainClick,
 }: BarChartProps) {
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null);
@@ -38,20 +44,45 @@ export default function BarChart({
       .sort((a, b) => b.score - a.score);
   }, [domains, getDomainScore, comparisonDomainScores]);
 
+  const multiComparisonSeries = useMemo(() => {
+    if (!comparisonSeries) return null;
+    return comparisonSeries.map((series) => ({
+      ...series,
+      values: domains.map((d) => series.scores[d.id] || 0),
+    }));
+  }, [domains, comparisonSeries]);
+
   const maxScore = Math.max(...domainData.map((d) => d.score), 100);
 
   return (
     <div className="space-y-3">
-      {comparisonDomainScores && comparisonLabel && (
+      {comparisonDomainScores && comparisonLabel && !multiComparisonSeries && (
         <div className="flex items-center justify-end gap-2 text-[10px] text-gray-400 -mt-1">
           <span className="w-2 h-2 rounded-full bg-indigo-500" />
           <span>Overlay: {comparisonLabel}</span>
+        </div>
+      )}
+      {multiComparisonSeries && (
+        <div className="flex flex-wrap items-center justify-end gap-3 text-[10px] text-gray-400 -mt-1">
+          {multiComparisonSeries.map((series) => (
+            <div key={series.label} className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: series.color }} />
+              <span>{series.label}</span>
+            </div>
+          ))}
         </div>
       )}
       {domainData.map((domain) => {
         const isHovered = hoveredDomain === domain.id;
         const barWidth = (domain.score / maxScore) * 100;
         const compWidth = domain.comparison !== null ? (domain.comparison / maxScore) * 100 : 0;
+        const overlayWidths = multiComparisonSeries
+          ? multiComparisonSeries.map((series) => ({
+              label: series.label,
+              color: series.color,
+              width: (series.values[domainData.findIndex((d) => d.id === domain.id)] / maxScore) * 100,
+            }))
+          : [];
 
         return (
           <div
@@ -111,8 +142,20 @@ export default function BarChart({
                     width: `${compWidth}%`,
                     backgroundColor: "#6366f1",
                   }}
-                />
+                  />
               )}
+              {multiComparisonSeries &&
+                overlayWidths.map((series, idx) => (
+                  <div
+                    key={series.label}
+                    className="absolute inset-y-0 left-0 rounded-full opacity-30"
+                    style={{
+                      width: `${series.width}%`,
+                      backgroundColor: series.color,
+                      transform: `translateY(${idx - 1}px)`,
+                    }}
+                  />
+                ))}
               {/* Main bar */}
               <div
                 className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"

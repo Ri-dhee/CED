@@ -9,6 +9,7 @@ import {
 import {
   FrameworkProposal,
   loadFramework,
+  cacheFramework,
   saveFramework,
   loadFrameworkFromApi,
   createProposal,
@@ -18,7 +19,7 @@ import {
   newSubDomain,
   newIndicator,
 } from "./grme-framework";
-import { supabase } from "./supabase";
+import { supabase, hasSupabaseConfig } from "./supabase";
 
 const CURRENT_USER = "Stakeholder";
 
@@ -27,32 +28,54 @@ export function useGRMEFramework() {
   const [proposals, setProposals] = useState<FrameworkProposal[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const isRemoteNewer = useCallback(
+    (remote: { lastUpdated: string }, local: { lastUpdated: string }) => {
+      return (remote.lastUpdated || "") >= (local.lastUpdated || "");
+    },
+    []
+  );
+
   const refreshFramework = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      const fw = loadFramework();
+      setDomains(fw.domains);
+      setProposals(fw.proposals);
+      return;
+    }
     try {
       const apiFw = await loadFrameworkFromApi();
       if (apiFw) {
-        setDomains(apiFw.domains);
-        setProposals(apiFw.proposals);
-        saveFramework(apiFw);
+        const localFw = loadFramework();
+        const chosen = isRemoteNewer(apiFw, localFw) ? apiFw : localFw;
+        setDomains(chosen.domains);
+        setProposals(chosen.proposals);
+        cacheFramework(chosen);
       }
     } catch {
       // Keep current state
     }
-  }, []);
+  }, [isRemoteNewer]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
+      if (!hasSupabaseConfig) {
+        if (!cancelled) {
+          const fw = loadFramework();
+          setDomains(fw.domains);
+          setProposals(fw.proposals);
+          setLoaded(true);
+        }
+        return;
+      }
       const apiFw = await loadFrameworkFromApi();
-      if (!cancelled && apiFw) {
-        setDomains(apiFw.domains);
-        setProposals(apiFw.proposals);
-        saveFramework(apiFw);
-      } else if (!cancelled) {
-        const fw = loadFramework();
-        setDomains(fw.domains);
-        setProposals(fw.proposals);
+      if (!cancelled) {
+        const localFw = loadFramework();
+        const chosen = apiFw && isRemoteNewer(apiFw, localFw) ? apiFw : localFw;
+        setDomains(chosen.domains);
+        setProposals(chosen.proposals);
+        cacheFramework(chosen);
       }
       if (!cancelled) setLoaded(true);
     }
@@ -63,6 +86,7 @@ export function useGRMEFramework() {
 
   // Real-time subscription — auto-refresh when framework changes
   useEffect(() => {
+    if (!hasSupabaseConfig) return;
     const channel = supabase
       .channel("framework-changes")
       .on(

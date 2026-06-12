@@ -8,6 +8,11 @@ interface RadarChartProps {
   getDomainScore: (domainId: string) => number;
   comparisonDomainScores?: Record<string, number> | null;
   comparisonLabel?: string;
+  comparisonSeries?: Array<{
+    label: string;
+    scores: Record<string, number>;
+    color: string;
+  }> | null;
   size?: number;
   onDomainClick?: (domainId: string) => void;
 }
@@ -17,18 +22,17 @@ export default function RadarChart({
   getDomainScore,
   comparisonDomainScores = null,
   comparisonLabel,
+  comparisonSeries = null,
   size = 400,
   onDomainClick,
 }: RadarChartProps) {
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  if (domains.length === 0) return null;
-
   const center = size / 2;
   const radius = (size / 2) * 0.65;
   const levels = 4;
-  const angleStep = (2 * Math.PI) / domains.length;
+  const angleStep = domains.length > 0 ? (2 * Math.PI) / domains.length : 0;
 
   const getPoint = (index: number, value: number) => {
     const angle = angleStep * index - Math.PI / 2;
@@ -49,6 +53,14 @@ export default function RadarChart({
     return domains.map((d) => comparisonDomainScores[d.id] || 0);
   }, [domains, comparisonDomainScores]);
 
+  const multiComparisonSeries = useMemo(() => {
+    if (!comparisonSeries) return null;
+    return comparisonSeries.map((series) => ({
+      ...series,
+      values: domains.map((d) => series.scores[d.id] || 0),
+    }));
+  }, [domains, comparisonSeries]);
+
   const getPolygonPoints = (vals: number[]) => {
     return vals
       .map((score, i) => {
@@ -68,7 +80,7 @@ export default function RadarChart({
       .join(" ");
   });
 
-  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
   const avgStatus = getStatusFromScore(avgScore);
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -82,6 +94,8 @@ export default function RadarChart({
   const hoveredIndex = hoveredDomain
     ? domains.findIndex((d) => d.id === hoveredDomain)
     : -1;
+
+  if (domains.length === 0) return null;
 
   return (
     <div className="relative">
@@ -123,8 +137,8 @@ export default function RadarChart({
           );
         })}
 
-        {/* Comparison polygon */}
-        {comparisonScores && (
+        {/* Comparison polygon (single) */}
+        {comparisonScores && !multiComparisonSeries && (
           <polygon
             points={getPolygonPoints(comparisonScores)}
             fill="rgba(99, 102, 241, 0.08)"
@@ -134,6 +148,21 @@ export default function RadarChart({
             className="transition-all duration-300"
           />
         )}
+
+        {/* Comparison polygons (multi-series) */}
+        {multiComparisonSeries &&
+          multiComparisonSeries.map((series, idx) => (
+            <polygon
+              key={series.label}
+              points={getPolygonPoints(series.values)}
+              fill={`${series.color}22`}
+              stroke={series.color}
+              strokeWidth="2"
+              strokeDasharray={idx === 0 ? "6 3" : "2 2"}
+              className="transition-all duration-300"
+              opacity={0.75}
+            />
+          ))}
 
         {/* Main polygon */}
         <polygon
@@ -268,13 +297,30 @@ export default function RadarChart({
               {Math.round(scores[hoveredIndex])}
             </span>
           </div>
-          {comparisonScores && (
+          {(comparisonScores || multiComparisonSeries) && (
             <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 rounded-full bg-indigo-500" />
-              <span className="text-gray-600">{comparisonLabel || "Previous"}:</span>
-              <span className="font-bold text-indigo-600">
-                {Math.round(comparisonScores[hoveredIndex])}
-              </span>
+              {comparisonScores && !multiComparisonSeries && (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                  <span className="text-gray-600">{comparisonLabel || "Previous"}:</span>
+                  <span className="font-bold text-indigo-600">
+                    {Math.round(comparisonScores[hoveredIndex])}
+                  </span>
+                </>
+              )}
+              {multiComparisonSeries && (
+                <div className="space-y-1">
+                  {multiComparisonSeries.map((series) => (
+                    <div key={series.label} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: series.color }} />
+                      <span className="text-gray-600">{series.label}:</span>
+                      <span className="font-bold" style={{ color: series.color }}>
+                        {Math.round(series.values[hoveredIndex])}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {onDomainClick && (
@@ -284,7 +330,7 @@ export default function RadarChart({
       )}
 
       {/* Comparison legend */}
-      {comparisonScores && (
+      {comparisonScores && !multiComparisonSeries && (
         <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 text-[10px]">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-0.5 bg-primary rounded" />
@@ -294,6 +340,16 @@ export default function RadarChart({
             <span className="w-3 h-0.5 bg-indigo-500 rounded border-dashed" style={{ borderTop: "2px dashed #6366f1", height: 0 }} />
             <span className="text-gray-500">{comparisonLabel || "Previous"}</span>
           </div>
+        </div>
+      )}
+      {multiComparisonSeries && (
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap justify-center gap-3 text-[10px] px-2">
+          {multiComparisonSeries.map((series) => (
+            <div key={series.label} className="flex items-center gap-1.5">
+              <span className="w-3 h-0.5 rounded" style={{ backgroundColor: series.color }} />
+              <span className="text-gray-500">{series.label}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

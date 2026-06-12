@@ -40,11 +40,93 @@ export interface FrameworkStorage {
 
 const STORAGE_KEY = "grme-framework";
 const CURRENT_USER = "Stakeholder";
+const VALID_INDICATOR_TYPES = new Set(["Quantitative", "Qualitative", "Participatory"]);
+const VALID_DATA_TYPES = new Set(["number", "percentage", "index", "text", "boolean"]);
+const VALID_DIRECTIONS = new Set(["higher", "lower"]);
 
 // ── ID Generation ───────────────────────────────────────────────
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isBenchmark(value: unknown): value is Benchmark {
+  return (
+    isObject(value) &&
+    typeof value.critical === "string" &&
+    typeof value.developing === "string" &&
+    typeof value.progressive === "string" &&
+    typeof value.exemplary === "string"
+  );
+}
+
+function isIndicator(value: unknown): value is Indicator {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    VALID_INDICATOR_TYPES.has(String(value.type)) &&
+    VALID_DATA_TYPES.has(String(value.dataType)) &&
+    typeof value.unit === "string" &&
+    typeof value.description === "string" &&
+    isBenchmark(value.benchmark) &&
+    VALID_DIRECTIONS.has(String(value.direction))
+  );
+}
+
+function isSubDomain(value: unknown): value is SubDomain {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Array.isArray(value.indicators) &&
+    value.indicators.every(isIndicator)
+  );
+}
+
+function isDomain(value: unknown): value is Domain {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.shortName === "string" &&
+    typeof value.description === "string" &&
+    typeof value.icon === "string" &&
+    typeof value.color === "string" &&
+    Array.isArray(value.subdomains) &&
+    value.subdomains.every(isSubDomain)
+  );
+}
+
+function isProposal(value: unknown): value is FrameworkProposal {
+  if (!isObject(value)) return false;
+  const proposal = value as Record<string, unknown>;
+  return (
+    typeof proposal.id === "string" &&
+    typeof proposal.timestamp === "string" &&
+    typeof proposal.proposedBy === "string" &&
+    (proposal.action === "add" || proposal.action === "edit" || proposal.action === "delete") &&
+    (proposal.entity === "domain" || proposal.entity === "subdomain" || proposal.entity === "indicator") &&
+    typeof proposal.entityPath === "string" &&
+    isObject(proposal.data) &&
+    (proposal.originalData === undefined || isObject(proposal.originalData)) &&
+    (proposal.status === "pending" || proposal.status === "approved" || proposal.status === "rejected")
+  );
+}
+
+function sanitizeFrameworkStorage(value: unknown): FrameworkStorage | null {
+  if (!isObject(value)) return null;
+  if (!Array.isArray(value.domains) || !Array.isArray(value.proposals)) return null;
+  if (!value.domains.every(isDomain)) return null;
+  return {
+    domains: value.domains,
+    proposals: value.proposals.filter(isProposal),
+    lastUpdated: typeof value.lastUpdated === "string" ? value.lastUpdated : new Date().toISOString(),
+  };
 }
 
 export function generateEntityId(prefix: string): string {
@@ -60,7 +142,8 @@ export function loadFramework(): FrameworkStorage {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = sanitizeFrameworkStorage(JSON.parse(raw));
+      if (parsed) return parsed;
     }
   } catch {
     // fall through
@@ -71,7 +154,7 @@ export function loadFramework(): FrameworkStorage {
     proposals: [],
     lastUpdated: new Date().toISOString(),
   };
-  saveFramework(seed);
+  cacheFramework(seed);
   return seed;
 }
 
@@ -81,6 +164,11 @@ export function saveFramework(fw: FrameworkStorage): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   // Sync to API (fire-and-forget)
   api.saveFramework(saved).catch(() => {});
+}
+
+export function cacheFramework(fw: FrameworkStorage): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(fw));
 }
 
 // ── Default Framework ───────────────────────────────────────────
@@ -404,10 +492,7 @@ export const AVAILABLE_COLORS = [
 export async function loadFrameworkFromApi(): Promise<FrameworkStorage | null> {
   try {
     const data = await api.loadFramework();
-    if (data && data.domains && data.domains.length > 0) {
-      return data;
-    }
-    return null;
+    return sanitizeFrameworkStorage(data);
   } catch {
     return null;
   }

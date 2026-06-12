@@ -32,6 +32,21 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   viewer: "View dashboard and data only",
 };
 
+function isUserRole(value: unknown): value is UserRole {
+  return value === "admin" || value === "editor" || value === "viewer";
+}
+
+function normalizeUser(value: unknown): GrmeUser | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.name !== "string" || !isUserRole(candidate.role)) return null;
+  return {
+    name: candidate.name,
+    role: candidate.role,
+    loginAt: typeof candidate.loginAt === "string" ? candidate.loginAt : new Date().toISOString(),
+  };
+}
+
 export function canEditFramework(role: UserRole): boolean {
   return role === "admin";
 }
@@ -70,7 +85,7 @@ export function loadUser(): GrmeUser | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? normalizeUser(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
@@ -91,7 +106,7 @@ async function loadSessionUser(): Promise<GrmeUser | null> {
     const res = await fetch("/api/grme/session", { credentials: "include" });
     if (!res.ok) return null;
     const json = await res.json();
-    return json.user || null;
+    return normalizeUser(json.user);
   } catch {
     return null;
   }
@@ -113,7 +128,11 @@ async function saveSessionUser(
     if (!res.ok) {
       return { success: false, error: json.error || "Login failed" };
     }
-    return { success: true, user: json.user };
+    const user = normalizeUser(json.user);
+    if (!user) {
+      return { success: false, error: "Session service returned invalid user data" };
+    }
+    return { success: true, user };
   } catch {
     return { success: false, error: "Unable to contact session service" };
   }

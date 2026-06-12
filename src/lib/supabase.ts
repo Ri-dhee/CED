@@ -1,18 +1,52 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+export const hasSupabaseConfig =
+  Boolean(supabaseUrl && supabaseAnonKey) &&
+  !supabaseUrl.includes("placeholder.supabase.co") &&
+  supabaseAnonKey !== "placeholder";
+
+function createNoopSupabase(): SupabaseClient {
+  const noopResult = { data: null, error: null };
+
+  const makeProxy = (): SupabaseClient =>
+    new Proxy(function () {}, {
+      get(_target, prop) {
+        if (prop === "then") {
+          return (resolve: (value: typeof noopResult) => void) => resolve(noopResult);
+        }
+        if (prop === "catch") {
+          return () => Promise.resolve(noopResult);
+        }
+        if (prop === "finally") {
+          return (callback?: () => void) => {
+            callback?.();
+            return Promise.resolve(noopResult);
+          };
+        }
+        if (prop === "removeChannel") {
+          return () => Promise.resolve(true);
+        }
+        return (..._args: unknown[]) => makeProxy();
+      },
+      apply() {
+        return makeProxy();
+      },
+    }) as unknown as SupabaseClient;
+
+  return makeProxy();
+}
 
 export function getSupabase(): SupabaseClient {
   if (client) return client;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-
-  if (!url || !key) {
-    // Return a dummy client that will fail gracefully
-    client = createClient("https://placeholder.supabase.co", "placeholder");
+  if (!hasSupabaseConfig) {
+    client = createNoopSupabase();
   } else {
-    client = createClient(url, key);
+    client = createClient(supabaseUrl, supabaseAnonKey);
   }
 
   return client;

@@ -511,10 +511,11 @@ export default function TrendChart({
   domainLabels,
   domainColors,
 }: TrendChartProps) {
+  const [activeView, setActiveView] = useState<"overview" | "domains" | "heatmap">("overview");
+
   if (years.length === 0) return null;
 
   const sortedYears = [...years].sort((a, b) => a - b);
-  const [activeView, setActiveView] = useState<"overview" | "domains" | "heatmap">("overview");
 
   // Summary
   const firstYear = sortedYears[0];

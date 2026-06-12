@@ -23,7 +23,8 @@ export default function UserBadge({
   onLogout,
 }: UserBadgeProps) {
   const [open, setOpen] = useState(false);
-  const colors = ROLE_COLORS[user.role];
+  const colors = ROLE_COLORS[user.role] || ROLE_COLORS.viewer;
+  const roleLabel = ROLE_LABELS[user.role] || ROLE_LABELS.viewer;
 
   return (
     <div className="relative">
@@ -43,7 +44,7 @@ export default function UserBadge({
           className="text-[10px] font-bold px-1.5 py-0.5 rounded"
           style={{ backgroundColor: colors.bg, color: colors.text }}
         >
-          {ROLE_LABELS[user.role]}
+          {roleLabel}
         </span>
         <svg
           className={`w-3 h-3 text-gray-400 transition-transform ${

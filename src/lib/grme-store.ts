@@ -17,7 +17,7 @@ import {
   calculateWeightedOverallScore,
 } from "./grme-data";
 import * as api from "./grme-api";
-import { supabase } from "./supabase";
+import { supabase, hasSupabaseConfig } from "./supabase";
 
 const STORAGE_KEY = "grme-data";
 
@@ -61,6 +61,42 @@ function migrateOldFormat(
   return result;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeAssessmentYear(value: unknown, year: number): AssessmentYear | null {
+  if (!isRecord(value) || !isRecord(value.indicators) || !Array.isArray(value.auditLog)) {
+    return null;
+  }
+
+  return {
+    year,
+    indicators: value.indicators as Record<string, IndicatorData>,
+    auditLog: value.auditLog as AuditLog[],
+    createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date().toISOString(),
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date().toISOString(),
+  };
+}
+
+function sanitizeCityData(value: unknown, cityId: string): CityData | null {
+  if (!isRecord(value) || !isRecord(value.assessments)) return null;
+
+  const assessments: Record<number, AssessmentYear> = {};
+  for (const [yearKey, assessValue] of Object.entries(value.assessments)) {
+    const year = Number(yearKey);
+    if (!Number.isFinite(year)) continue;
+    const sanitized = sanitizeAssessmentYear(assessValue, year);
+    if (sanitized) assessments[year] = sanitized;
+  }
+
+  return {
+    cityId: typeof value.cityId === "string" ? value.cityId : cityId,
+    cityName: typeof value.cityName === "string" ? value.cityName : cityId,
+    assessments,
+  };
+}
+
 function loadAllData(): Record<string, CityData> {
   if (typeof window === "undefined") return {};
   try {
@@ -73,7 +109,13 @@ function loadAllData(): Record<string, CityData> {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       return migrated;
     }
-    return parsed;
+    if (!isRecord(parsed)) return {};
+    const sanitized: Record<string, CityData> = {};
+    for (const [cityId, cityValue] of Object.entries(parsed)) {
+      const city = sanitizeCityData(cityValue, cityId);
+      if (city) sanitized[cityId] = city;
+    }
+    return sanitized;
   } catch {
     return {};
   }
@@ -86,6 +128,52 @@ function saveAllData(data: Record<string, CityData>): void {
   } catch (e) {
     console.error("Failed to save GRME data:", e);
   }
+}
+
+function mergeAssessmentYear(
+  remote: AssessmentYear | undefined,
+  local: AssessmentYear | undefined
+): AssessmentYear | undefined {
+  if (!remote) return local;
+  if (!local) return remote;
+
+  const remoteTs = remote.updatedAt || remote.createdAt || "";
+  const localTs = local.updatedAt || local.createdAt || "";
+  return localTs >= remoteTs ? local : remote;
+}
+
+function mergeCityData(remote: CityData, local: CityData): CityData {
+  const assessments: Record<number, AssessmentYear> = { ...remote.assessments };
+
+  for (const [yearKey, localAssessment] of Object.entries(local.assessments)) {
+    const year = Number(yearKey);
+    assessments[year] = mergeAssessmentYear(assessments[year], localAssessment) || localAssessment;
+  }
+
+  return {
+    ...remote,
+    cityId: local.cityId || remote.cityId,
+    cityName: local.cityName || remote.cityName,
+    assessments,
+  };
+}
+
+function mergeDataSources(
+  remoteData: Record<string, CityData>,
+  localData: Record<string, CityData>
+): Record<string, CityData> {
+  const merged: Record<string, CityData> = { ...remoteData };
+
+  for (const [cityId, localCity] of Object.entries(localData)) {
+    if (!localCity || !isRecord(localCity) || !isRecord(localCity.assessments)) {
+      continue;
+    }
+    merged[cityId] = merged[cityId]
+      ? mergeCityData(merged[cityId], localCity)
+      : localCity;
+  }
+
+  return merged;
 }
 
 function findIndicatorInDomains(
@@ -141,11 +229,18 @@ export function useGRMEData(
   // ── Refresh data from Supabase ───────────────────────────────
 
   const refreshData = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      setAllData(loadAllData());
+      setApiAvailable(false);
+      return;
+    }
     try {
       const apiData = await api.loadAssessments();
       const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
-      setAllData(reconciled);
-      saveAllData(reconciled);
+      const localData = loadAllData();
+      const merged = mergeDataSources(reconciled, localData);
+      setAllData(merged);
+      saveAllData(merged);
       setApiAvailable(true);
     } catch {
       setApiAvailable(false);
@@ -157,12 +252,21 @@ export function useGRMEData(
     let cancelled = false;
 
     async function init() {
+      if (!hasSupabaseConfig) {
+        if (!cancelled) {
+          setAllData(loadAllData());
+          setApiAvailable(false);
+        }
+        return;
+      }
       try {
         const apiData = await api.loadAssessments();
         if (!cancelled) {
           const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
-          setAllData(reconciled);
-          saveAllData(reconciled);
+          const localData = loadAllData();
+          const merged = mergeDataSources(reconciled, localData);
+          setAllData(merged);
+          saveAllData(merged);
           setApiAvailable(true);
         }
       } catch {
@@ -187,6 +291,7 @@ export function useGRMEData(
 
   // Real-time subscription — auto-refresh when data changes in Supabase
   useEffect(() => {
+    if (!hasSupabaseConfig) return;
     const channel = supabase
       .channel("assessment-changes")
       .on(
@@ -232,10 +337,10 @@ export function useGRMEData(
 
   const createYear = useCallback(
     async (year: number, copyFrom?: number) => {
-      const city = ensureCity(selectedCity);
       let indicators: Record<string, IndicatorData> = {};
       let auditLog: AuditLog[] = [];
 
+      const city = ensureCity(selectedCity);
       if (copyFrom && city.assessments[copyFrom]) {
         indicators = JSON.parse(
           JSON.stringify(city.assessments[copyFrom].indicators)
@@ -259,19 +364,20 @@ export function useGRMEData(
         },
       };
 
-      const newData = {
-        ...allData,
-        [selectedCity]: updatedCity,
-      };
-
-      setAllData(newData);
-      saveAllData(newData);
+      setAllData((prev) => {
+        const nextData = {
+          ...prev,
+          [selectedCity]: updatedCity,
+        };
+        saveAllData(nextData);
+        return nextData;
+      });
 
       if (apiAvailable) {
         await api.saveAssessments(selectedCity, year, indicators);
       }
     },
-    [allData, selectedCity, ensureCity, apiAvailable]
+    [selectedCity, ensureCity, apiAvailable]
   );
 
   // ── Delete year ────────────────────────────────────────────
@@ -287,19 +393,20 @@ export function useGRMEData(
         assessments: newAssessments,
       };
 
-      const newData = {
-        ...allData,
-        [selectedCity]: updatedCity,
-      };
-
-      setAllData(newData);
-      saveAllData(newData);
+      setAllData((prev) => {
+        const nextData = {
+          ...prev,
+          [selectedCity]: updatedCity,
+        };
+        saveAllData(nextData);
+        return nextData;
+      });
 
       if (apiAvailable) {
         await api.deleteYear(selectedCity, year);
       }
     },
-    [allData, selectedCity, ensureCity, apiAvailable]
+    [selectedCity, ensureCity, apiAvailable]
   );
 
   // ── Update indicator ───────────────────────────────────────
@@ -369,20 +476,21 @@ export function useGRMEData(
         },
       };
 
-      const newData = {
-        ...allData,
-        [selectedCity]: updatedCity,
-      };
-
-      setAllData(newData);
-      saveAllData(newData);
+      setAllData((prev) => {
+        const nextData = {
+          ...prev,
+          [selectedCity]: updatedCity,
+        };
+        saveAllData(nextData);
+        return nextData;
+      });
 
       if (apiAvailable) {
         await api.saveAssessment(selectedCity, currentYear, indicatorId, indicatorData);
         await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
       }
     },
-    [allData, selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
+    [selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
   );
 
   // ── Add audit note ─────────────────────────────────────────
@@ -433,19 +541,20 @@ export function useGRMEData(
         },
       };
 
-      const newData = {
-        ...allData,
-        [selectedCity]: updatedCity,
-      };
-
-      setAllData(newData);
-      saveAllData(newData);
+      setAllData((prev) => {
+        const nextData = {
+          ...prev,
+          [selectedCity]: updatedCity,
+        };
+        saveAllData(nextData);
+        return nextData;
+      });
 
       if (apiAvailable) {
         await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
       }
     },
-    [allData, selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
+    [selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
   );
 
   // ── Scoring ────────────────────────────────────────────────

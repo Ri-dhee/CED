@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import * as api from "@/lib/grme-api";
 import { GRME_SESSION_COOKIE, getSessionSecret, GrmeSessionUser } from "@/lib/grme-session";
 import { UserRole } from "@/lib/grme-user";
+import { hasSupabaseConfig } from "@/lib/supabase";
 
 const encoder = new TextEncoder();
 
@@ -68,7 +69,7 @@ async function verifyLogin(
     return { name: existingSession.name, role, loginAt: new Date().toISOString() };
   }
 
-  const users = await api.loadUsers();
+  const users = hasSupabaseConfig ? await api.loadUsers().catch(() => []) : [];
   const found = users.find((u) => u.name.toLowerCase() === normalizedName.toLowerCase() && u.active);
 
   if (found) {

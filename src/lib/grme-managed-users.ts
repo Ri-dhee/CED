@@ -17,6 +17,25 @@ export interface ManagedUser {
 
 const STORAGE_KEY = "grme-managed-users";
 
+function isManagedUser(value: unknown): value is ManagedUser {
+  if (!value || typeof value !== "object") return false;
+  const user = value as Record<string, unknown>;
+  return (
+    typeof user.id === "string" &&
+    typeof user.name === "string" &&
+    (user.role === "admin" || user.role === "editor" || user.role === "viewer") &&
+    typeof user.passwordHash === "string" &&
+    typeof user.createdAt === "string" &&
+    (typeof user.lastLoginAt === "string" || user.lastLoginAt === null) &&
+    typeof user.active === "boolean"
+  );
+}
+
+function sanitizeUsers(value: unknown): ManagedUser[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isManagedUser);
+}
+
 // ── SHA-256 Hashing ─────────────────────────────────────────────
 
 export async function hashPassword(password: string): Promise<string> {
@@ -33,7 +52,7 @@ function loadUsers(): ManagedUser[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? sanitizeUsers(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
@@ -106,8 +125,9 @@ export function useManagedUsers() {
       try {
         const apiUsers = await api.loadUsers();
         if (!cancelled && apiUsers.length > 0) {
-          setUsers(apiUsers);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(apiUsers)); // sync to localStorage
+          const sanitized = sanitizeUsers(apiUsers);
+          setUsers(sanitized);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized)); // sync to localStorage
           return;
         }
       } catch {
@@ -126,17 +146,18 @@ export function useManagedUsers() {
   useEffect(() => {
     const channel = supabase
       .channel("users-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "managed_users" },
-        async () => {
-          try {
-            const apiUsers = await api.loadUsers();
-            setUsers(apiUsers);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(apiUsers));
-          } catch {
-            // Keep current state
-          }
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "managed_users" },
+          async () => {
+            try {
+              const apiUsers = await api.loadUsers();
+              const sanitized = sanitizeUsers(apiUsers);
+              setUsers(sanitized);
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+            } catch {
+              // Keep current state
+            }
         }
       )
       .subscribe();

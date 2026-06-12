@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   CITIES,
   getStatusFromScore,
@@ -69,11 +69,13 @@ function GRMEApp({
   onSwitchRole: (role: "admin" | "editor" | "viewer") => void;
   onLogout: () => void;
 }) {
+  const YEAR_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#0ea5e9", "#14b8a6"];
   const framework = useGRMEFramework();
   const { trackSync } = useSync();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [overlayYear, setOverlayYear] = useState<number | null>(null);
+  const [overlayMode, setOverlayMode] = useState<"auto" | "specific" | "all">("auto");
+  const [selectedOverlayYears, setSelectedOverlayYears] = useState<number[]>([]);
 
   const {
     cityData,
@@ -185,7 +187,38 @@ function GRMEApp({
     const currentIdx = sortedYears.indexOf(selectedYear);
     return currentIdx > 0 ? sortedYears[currentIdx - 1] : null;
   }, [availableYears, selectedYear]);
-  const comparisonYear = overlayYear ?? previousYear;
+
+  const overlayYears = useMemo(() => {
+    if (overlayMode === "all") {
+      return [...availableYears]
+        .filter((year) => year !== selectedYear)
+        .sort((a, b) => a - b);
+    }
+    if (overlayMode === "specific") {
+      return selectedOverlayYears.slice().sort((a, b) => a - b);
+    }
+    return previousYear ? [previousYear] : [];
+  }, [availableYears, overlayMode, previousYear, selectedOverlayYears, selectedYear]);
+
+  const comparisonYear = overlayYears.length === 1 ? overlayYears[0] : null;
+
+  useEffect(() => {
+    if (overlayMode !== "specific") return;
+
+    setSelectedOverlayYears((current) => {
+      const next = current.filter((year) => availableYears.includes(year) && year !== selectedYear);
+      if (next.length > 0) return next;
+      return previousYear ? [previousYear] : next;
+    });
+  }, [availableYears, overlayMode, previousYear, selectedYear]);
+
+  const toggleOverlayYear = useCallback((year: number) => {
+    setSelectedOverlayYears((current) =>
+      current.includes(year)
+        ? current.filter((value) => value !== year)
+        : [...current, year].sort((a, b) => a - b)
+    );
+  }, []);
 
   const overallScore = useMemo(() => getOverallScore(), [getOverallScore]);
   const stats = useMemo(() => getDataEntryStats(), [getDataEntryStats]);
@@ -213,12 +246,16 @@ function GRMEApp({
       ),
     0
   );
-  const comparisonDomainScores = useMemo(() => {
-    if (!comparisonYear) return null;
-    return Object.fromEntries(
-      framework.domains.map((d) => [d.id, getDomainScoreForYear(d.id, comparisonYear)])
-    );
-  }, [comparisonYear, framework.domains, getDomainScoreForYear]);
+  const comparisonSeries = useMemo(() => {
+    if (overlayYears.length === 0) return null;
+    return overlayYears.map((year, idx) => ({
+      label: String(year),
+      scores: Object.fromEntries(
+        framework.domains.map((d) => [d.id, getDomainScoreForYear(d.id, year)])
+      ),
+      color: YEAR_COLORS[idx % YEAR_COLORS.length],
+    }));
+  }, [YEAR_COLORS, framework.domains, getDomainScoreForYear, overlayYears]);
 
   const isAdmin = canEditFramework(user.role);
   const canEdit = canEnterData(user.role);
@@ -443,34 +480,69 @@ function GRMEApp({
                   <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                     Domain Profile
                   </h2>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-400">Overlay:</span>
+                  <div className="flex flex-wrap items-center gap-2 text-xs justify-end">
+                    <span className="text-gray-400">Layer:</span>
                     <select
-                      value={overlayYear ?? "auto"}
-                      onChange={(e) =>
-                        setOverlayYear(
-                          e.target.value === "auto" ? null : Number(e.target.value)
-                        )
-                      }
+                      value={overlayMode}
+                      onChange={(e) => setOverlayMode(e.target.value as typeof overlayMode)}
                       className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-gray-600"
                     >
                       <option value="auto">Auto (previous year)</option>
-                      {availableYears
-                        .filter((year) => year !== selectedYear)
-                        .map((year) => (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
-                        ))}
+                      <option value="specific">Pick years</option>
+                      <option value="all">All years</option>
                     </select>
+                    {overlayMode === "specific" && (
+                      <div className="w-full flex flex-wrap items-center gap-2 pt-1">
+                        <span className="text-[11px] text-gray-400">Select one or more years:</span>
+                        {availableYears
+                          .filter((year) => year !== selectedYear)
+                          .map((year) => {
+                            const active = selectedOverlayYears.includes(year);
+                            return (
+                              <button
+                                key={year}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => toggleOverlayYear(year)}
+                                className={`px-2 py-1 rounded-lg border text-[11px] font-medium transition-all ${
+                                  active
+                                    ? "bg-primary text-white border-primary shadow-sm"
+                                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                                }`}
+                              >
+                                {year}
+                              </button>
+                            );
+                          })}
+                        {selectedOverlayYears.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOverlayYears([])}
+                            className="px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-[11px] font-medium text-gray-500 hover:bg-gray-100"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
+                {overlayYears.length > 0 && (
+                  <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
+                    <span className="text-gray-400">Layers:</span>
+                    {overlayYears.map((year, idx) => (
+                      <span key={year} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 border border-gray-100">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: YEAR_COLORS[idx % YEAR_COLORS.length] }} />
+                        {year}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="max-w-sm mx-auto">
                   <RadarChart
                     domains={framework.domains}
                     getDomainScore={getDomainScore}
-                    comparisonDomainScores={comparisonDomainScores || undefined}
-                    comparisonLabel={comparisonYear ? String(comparisonYear) : undefined}
+                    comparisonSeries={comparisonSeries}
                     size={340}
                     onDomainClick={(id) => {
                       if (canEdit) {
@@ -563,7 +635,7 @@ function GRMEApp({
             </div>
 
             {/* ═══ COMPARISON ROW (2+ years) ═══ */}
-            {availableYears.length >= 2 && comparisonYear && (
+            {availableYears.length >= 2 && comparisonYear && overlayMode !== "all" && (
               <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 {comparisonStats && (currentStats.confidence < 80 || comparisonStats.confidence < 80) && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -593,6 +665,12 @@ function GRMEApp({
                   getCurrentDomainScore={getDomainScore}
                   getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, comparisonYear || selectedYear)}
                 />
+              </div>
+            )}
+
+            {availableYears.length >= 2 && overlayMode === "specific" && overlayYears.length > 1 && (
+              <div className="mt-6 rounded-2xl border border-gray-200 bg-white/80 px-5 py-4 text-sm text-gray-600">
+                Multi-year layers are active above. Switch to a single year to see the pairwise comparison panel.
               </div>
             )}
 
