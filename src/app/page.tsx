@@ -1,5 +1,4 @@
 import Link from "next/link";
-import ContactForm from "@/components/ContactForm";
 
 const services = [
   {
@@ -278,20 +277,26 @@ export default function Home() {
       </section>
 
       <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <span className="text-sm font-semibold text-primary uppercase tracking-widest">Let&apos;s Collaborate</span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
-              Ready to Make a <span className="gradient-text">Difference</span>?
-            </h2>
-            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-              Partner with CED to transform your environmental challenges into
-              opportunities for sustainable growth.
-            </p>
-          </div>
-          <div className="bg-gradient-to-br from-slate-50 to-emerald-50 rounded-3xl p-8 md:p-12 border border-gray-100">
-            <ContactForm />
-          </div>
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <span className="text-sm font-semibold text-primary uppercase tracking-widest">Let&apos;s Collaborate</span>
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+            Ready to Make a <span className="gradient-text">Difference</span>?
+          </h2>
+          <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-10">
+            Partner with CED to transform your environmental challenges into
+            opportunities for sustainable growth.
+          </p>
+          <a
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@ced-consult.com&subject=CED%20Inquiry"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Send Us an Email
+          </a>
         </div>
       </section>
     </div>
