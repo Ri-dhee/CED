@@ -105,52 +105,63 @@ function GRMEApp({
 
   // Sync-wrapped mutations — every save shows status
   const trackedUpdateIndicator = useCallback(
-    (indicatorId: string, value: number | string, notes?: string) => {
+    async (indicatorId: string, value: number | string | boolean, notes?: string) => {
       const syncId = `indicator-${selectedCity}-${selectedYear}-${indicatorId}`;
-      const { onSuccess } = trackSync(syncId);
-      updateIndicator(indicatorId, value, notes);
-      // The API call is fire-and-forget inside the store, so we mark success after a brief delay
-      if (apiAvailable) {
-        setTimeout(onSuccess, 500);
+      const { onSuccess, onError } = trackSync(syncId);
+      try {
+        await updateIndicator(indicatorId, value, notes);
+        await refreshData();
+        onSuccess();
+      } catch {
+        onError();
       }
     },
-    [updateIndicator, trackSync, selectedCity, selectedYear, apiAvailable]
+    [updateIndicator, trackSync, selectedCity, selectedYear, refreshData]
   );
 
   const trackedAddAuditNote = useCallback(
-    (indicatorId: string, note: string) => {
+    async (indicatorId: string, note: string) => {
       const syncId = `audit-${selectedCity}-${selectedYear}-${indicatorId}`;
-      const { onSuccess } = trackSync(syncId);
-      addAuditNote(indicatorId, note);
-      if (apiAvailable) {
-        setTimeout(onSuccess, 500);
+      const { onSuccess, onError } = trackSync(syncId);
+      try {
+        await addAuditNote(indicatorId, note);
+        await refreshData();
+        onSuccess();
+      } catch {
+        onError();
       }
     },
-    [addAuditNote, trackSync, selectedCity, selectedYear, apiAvailable]
+    [addAuditNote, trackSync, selectedCity, selectedYear, refreshData]
   );
 
   const trackedCreateYear = useCallback(
-    (year: number, copyFrom?: number) => {
+    async (year: number, copyFrom?: number) => {
       const syncId = `create-year-${selectedCity}-${year}`;
-      const { onSuccess } = trackSync(syncId);
-      createYear(year, copyFrom);
-      if (apiAvailable) {
-        setTimeout(onSuccess, 500);
+      const { onSuccess, onError } = trackSync(syncId);
+      try {
+        await createYear(year, copyFrom);
+        await refreshData();
+        onSuccess();
+      } catch {
+        onError();
       }
     },
-    [createYear, trackSync, selectedCity, apiAvailable]
+    [createYear, trackSync, selectedCity, refreshData]
   );
 
   const trackedDeleteYear = useCallback(
-    (year: number) => {
+    async (year: number) => {
       const syncId = `delete-year-${selectedCity}-${year}`;
-      const { onSuccess } = trackSync(syncId);
-      deleteYear(year);
-      if (apiAvailable) {
-        setTimeout(onSuccess, 500);
+      const { onSuccess, onError } = trackSync(syncId);
+      try {
+        await deleteYear(year);
+        await refreshData();
+        onSuccess();
+      } catch {
+        onError();
       }
     },
-    [deleteYear, trackSync, selectedCity, apiAvailable]
+    [deleteYear, trackSync, selectedCity, refreshData]
   );
 
   const currentDomain =

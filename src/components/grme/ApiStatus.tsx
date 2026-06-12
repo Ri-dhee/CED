@@ -21,6 +21,7 @@ interface SyncContextValue {
   entries: SyncEntry[];
   hasErrors: boolean;
   retryAll: () => void;
+  lastVerifiedAt: number | null;
 }
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -35,6 +36,7 @@ export function useSync() {
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<SyncEntry[]>([]);
+  const [lastVerifiedAt, setLastVerifiedAt] = useState<number | null>(null);
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const trackSync = useCallback((id: string) => {
@@ -69,6 +71,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             e.id === id ? { ...e, status: "saved" as SyncStatus } : e
           )
         );
+        setLastVerifiedAt(Date.now());
         clearSaved(id);
       },
       onError: () => {
@@ -89,7 +92,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const hasErrors = entries.some((e) => e.status === "error");
 
   return (
-    <SyncContext.Provider value={{ trackSync, entries, hasErrors, retryAll }}>
+    <SyncContext.Provider value={{ trackSync, entries, hasErrors, retryAll, lastVerifiedAt }}>
       {children}
     </SyncContext.Provider>
   );
@@ -103,7 +106,7 @@ interface ApiStatusProps {
 }
 
 export default function ApiStatus({ apiAvailable, onRefresh }: ApiStatusProps) {
-  const { entries, hasErrors } = useSync();
+  const { entries, hasErrors, lastVerifiedAt } = useSync();
   const [queue, setQueue] = useState({ active: 0, pending: 0 });
   const [refreshing, setRefreshing] = useState(false);
 
@@ -146,6 +149,11 @@ export default function ApiStatus({ apiAvailable, onRefresh }: ApiStatusProps) {
     >
       <div className={`w-1.5 h-1.5 rounded-full ${refreshing ? "bg-blue-400 animate-pulse" : dotColor}`} />
       <span className="text-gray-500">{refreshing ? "Refreshing..." : label}</span>
+      {lastVerifiedAt && apiAvailable && (
+        <span className="text-[10px] text-gray-400">
+          Verified {new Date(lastVerifiedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      )}
       <svg
         className={`w-3 h-3 text-gray-400 ${refreshing ? "animate-spin" : ""}`}
         fill="none"

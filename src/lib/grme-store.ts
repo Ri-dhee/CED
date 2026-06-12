@@ -217,7 +217,7 @@ export function useGRMEData(
   // ── Create new year ────────────────────────────────────────
 
   const createYear = useCallback(
-    (year: number, copyFrom?: number) => {
+    async (year: number, copyFrom?: number) => {
       const city = ensureCity(selectedCity);
       let indicators: Record<string, IndicatorData> = {};
       let auditLog: AuditLog[] = [];
@@ -253,9 +253,8 @@ export function useGRMEData(
       setAllData(newData);
       saveAllData(newData);
 
-      // Sync to API (fire-and-forget)
       if (apiAvailable) {
-        api.saveAssessments(selectedCity, year, indicators).catch(() => {});
+        await api.saveAssessments(selectedCity, year, indicators);
       }
     },
     [allData, selectedCity, ensureCity, apiAvailable]
@@ -264,7 +263,7 @@ export function useGRMEData(
   // ── Delete year ────────────────────────────────────────────
 
   const deleteYear = useCallback(
-    (year: number) => {
+    async (year: number) => {
       const city = ensureCity(selectedCity);
       const newAssessments = { ...city.assessments };
       delete newAssessments[year];
@@ -282,9 +281,8 @@ export function useGRMEData(
       setAllData(newData);
       saveAllData(newData);
 
-      // Sync to API (fire-and-forget)
       if (apiAvailable) {
-        api.deleteYear(selectedCity, year).catch(() => {});
+        await api.deleteYear(selectedCity, year);
       }
     },
     [allData, selectedCity, ensureCity, apiAvailable]
@@ -293,7 +291,7 @@ export function useGRMEData(
   // ── Update indicator ───────────────────────────────────────
 
   const updateIndicator = useCallback(
-    (indicatorId: string, value: number | string, notes?: string) => {
+    async (indicatorId: string, value: number | string | boolean, notes?: string) => {
       const city = ensureCity(selectedCity);
       const assess = getOrCreateAssessment(city, currentYear);
       const existing = assess.indicators[indicatorId];
@@ -365,10 +363,9 @@ export function useGRMEData(
       setAllData(newData);
       saveAllData(newData);
 
-      // Sync to API (fire-and-forget)
       if (apiAvailable) {
-        api.saveAssessment(selectedCity, currentYear, indicatorId, indicatorData).catch(() => {});
-        api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry).catch(() => {});
+        await api.saveAssessment(selectedCity, currentYear, indicatorId, indicatorData);
+        await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
       }
     },
     [allData, selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
@@ -377,7 +374,7 @@ export function useGRMEData(
   // ── Add audit note ─────────────────────────────────────────
 
   const addAuditNote = useCallback(
-    (indicatorId: string, note: string) => {
+    async (indicatorId: string, note: string) => {
       const city = ensureCity(selectedCity);
       const assess = getOrCreateAssessment(city, currentYear);
 
@@ -430,9 +427,8 @@ export function useGRMEData(
       setAllData(newData);
       saveAllData(newData);
 
-      // Sync to API (fire-and-forget)
       if (apiAvailable) {
-        api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry).catch(() => {});
+        await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
       }
     },
     [allData, selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
