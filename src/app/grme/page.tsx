@@ -73,6 +73,7 @@ function GRMEApp({
   const { trackSync } = useSync();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [overlayYear, setOverlayYear] = useState<number | null>(null);
 
   const {
     cityData,
@@ -184,19 +185,17 @@ function GRMEApp({
     const currentIdx = sortedYears.indexOf(selectedYear);
     return currentIdx > 0 ? sortedYears[currentIdx - 1] : null;
   }, [availableYears, selectedYear]);
+  const comparisonYear = overlayYear ?? previousYear;
 
   const overallScore = useMemo(() => getOverallScore(), [getOverallScore]);
   const stats = useMemo(() => getDataEntryStats(), [getDataEntryStats]);
   const currentStats = stats;
-  const previousStats = useMemo(
-    () => (previousYear ? getDataEntryStatsForYear(previousYear) : null),
-    [getDataEntryStatsForYear, previousYear]
+  const comparisonStats = useMemo(
+    () => (comparisonYear ? getDataEntryStatsForYear(comparisonYear) : null),
+    [comparisonYear, getDataEntryStatsForYear]
   );
   const lowConfidenceYears = useMemo(
-    () =>
-      availableYears.filter(
-        (year) => getDataEntryStatsForYear(year).confidence < 80
-      ),
+    () => availableYears.filter((year) => getDataEntryStatsForYear(year).confidence < 80),
     [availableYears, getDataEntryStatsForYear]
   );
   const overallStatus = getStatusFromScore(overallScore);
@@ -214,6 +213,12 @@ function GRMEApp({
       ),
     0
   );
+  const comparisonDomainScores = useMemo(() => {
+    if (!comparisonYear) return null;
+    return Object.fromEntries(
+      framework.domains.map((d) => [d.id, getDomainScoreForYear(d.id, comparisonYear)])
+    );
+  }, [comparisonYear, framework.domains, getDomainScoreForYear]);
 
   const isAdmin = canEditFramework(user.role);
   const canEdit = canEnterData(user.role);
@@ -433,16 +438,39 @@ function GRMEApp({
               </div>
 
               {/* Radar Chart — core visual */}
-              <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-4">
+            <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                   <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                     Domain Profile
                   </h2>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-400">Overlay:</span>
+                    <select
+                      value={overlayYear ?? "auto"}
+                      onChange={(e) =>
+                        setOverlayYear(
+                          e.target.value === "auto" ? null : Number(e.target.value)
+                        )
+                      }
+                      className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-gray-600"
+                    >
+                      <option value="auto">Auto (previous year)</option>
+                      {availableYears
+                        .filter((year) => year !== selectedYear)
+                        .map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="max-w-sm mx-auto">
                   <RadarChart
                     domains={framework.domains}
                     getDomainScore={getDomainScore}
+                    comparisonDomainScores={comparisonDomainScores || undefined}
+                    comparisonLabel={comparisonYear ? String(comparisonYear) : undefined}
                     size={340}
                     onDomainClick={(id) => {
                       if (canEdit) {
@@ -535,9 +563,9 @@ function GRMEApp({
             </div>
 
             {/* ═══ COMPARISON ROW (2+ years) ═══ */}
-            {availableYears.length >= 2 && previousYear && (
+            {availableYears.length >= 2 && comparisonYear && (
               <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                {previousStats && (currentStats.confidence < 80 || previousStats.confidence < 80) && (
+                {comparisonStats && (currentStats.confidence < 80 || comparisonStats.confidence < 80) && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     This comparison is preliminary because one or both years have incomplete data.
                   </div>
@@ -561,9 +589,9 @@ function GRMEApp({
                 <ComparisonView
                   domains={framework.domains}
                   currentYear={selectedYear}
-                  previousYear={previousYear}
+                  previousYear={comparisonYear}
                   getCurrentDomainScore={getDomainScore}
-                  getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, previousYear)}
+                  getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, comparisonYear || selectedYear)}
                 />
               </div>
             )}

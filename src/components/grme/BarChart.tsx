@@ -42,6 +42,12 @@ export default function BarChart({
 
   return (
     <div className="space-y-3">
+      {comparisonDomainScores && comparisonLabel && (
+        <div className="flex items-center justify-end gap-2 text-[10px] text-gray-400 -mt-1">
+          <span className="w-2 h-2 rounded-full bg-indigo-500" />
+          <span>Overlay: {comparisonLabel}</span>
+        </div>
+      )}
       {domainData.map((domain) => {
         const isHovered = hoveredDomain === domain.id;
         const barWidth = (domain.score / maxScore) * 100;
