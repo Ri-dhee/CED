@@ -13,6 +13,9 @@ export default function BenchmarkLegend() {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
       <h3 className="text-sm font-bold text-gray-900 mb-3">Score Benchmarks</h3>
+      <p className="mb-3 text-[11px] leading-5 text-gray-500">
+        Composite scores use geometric mean, so weak domains pull the result down more than a simple average.
+      </p>
       <div className="space-y-2">
         {THRESHOLDS.map((t) => {
           const color = getStatusColor(t.status);

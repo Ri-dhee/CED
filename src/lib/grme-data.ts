@@ -179,8 +179,20 @@ export function getStatusBg(status: ScoreStatus): string {
 }
 
 /**
- * Calculate domain score using weighted average of indicator scores.
- * Each indicator contributes equally unless weights are specified.
+ * Geometric mean of an array of positive numbers.
+ * Clamps each value to a minimum of 0.001 to avoid zero collapse.
+ * Used instead of arithmetic mean to penalize domain imbalance —
+ * a city with (90, 10) scores lower than one with (50, 50).
+ */
+export function geometricMean(values: number[]): number {
+  if (values.length === 0) return 0;
+  const logSum = values.reduce((sum, v) => sum + Math.log(Math.max(v, 0.001)), 0);
+  return Math.exp(logSum / values.length);
+}
+
+/**
+ * Calculate domain score using geometric mean of indicator scores.
+ * This penalizes imbalance more than arithmetic averaging.
  */
 export function calculateDomainScore(
   domain: Domain,
@@ -192,17 +204,17 @@ export function calculateDomainScore(
     .filter((s): s is number => s !== null);
 
   if (scores.length === 0) return 50; // Default when no data entered
-  return scores.reduce((a, b) => a + b, 0) / scores.length;
+  return geometricMean(scores);
 }
 
 /**
- * Calculate overall score using equal domain weights.
+ * Calculate overall score using geometric mean of domain scores.
  */
 export function calculateOverallScore(
   getDomainScore: (id: string) => number
 ): number {
   const scores = DEFAULT_DOMAINS.map((d) => getDomainScore(d.id));
-  return scores.reduce((a, b) => a + b, 0) / scores.length;
+  return geometricMean(scores);
 }
 
 /**
