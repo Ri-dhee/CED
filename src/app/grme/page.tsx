@@ -201,6 +201,19 @@ function GRMEApp({
   );
   const overallStatus = getStatusFromScore(overallScore);
   const overallColor = getStatusColor(overallStatus);
+  const methodologyNotes = framework.domains
+    .map((d) => d.methodologyNote)
+    .filter((note): note is string => Boolean(note && note.trim()));
+  const draftIndicators = framework.domains.reduce(
+    (sum, d) =>
+      sum +
+      d.subdomains.reduce(
+        (subSum, s) =>
+          subSum + s.indicators.filter((i) => i.validationStatus === "draft").length,
+        0
+      ),
+    0
+  );
 
   const isAdmin = canEditFramework(user.role);
   const canEdit = canEnterData(user.role);
@@ -452,6 +465,27 @@ function GRMEApp({
                   getDataEntryStats={getDataEntryStats}
                 />
                 <BenchmarkLegend />
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2">Methodology</h3>
+                  <p className="text-[11px] leading-5 text-gray-500 mb-2">
+                    Scores use weighted geometric mean with confidence adjustment.
+                  </p>
+                  <p className="text-[11px] leading-5 text-gray-500 mb-2">
+                    {draftIndicators} indicators still need expert validation.
+                  </p>
+                  <div className="space-y-2">
+                    {methodologyNotes.slice(0, 2).map((note, idx) => (
+                      <div key={idx} className="rounded-xl bg-gray-50 p-3 text-[11px] text-gray-600 leading-5">
+                        {note}
+                      </div>
+                    ))}
+                    {methodologyNotes.length === 0 && (
+                      <div className="rounded-xl bg-gray-50 p-3 text-[11px] text-gray-500 leading-5">
+                        Add a methodology note to each domain to document weighting or interpretation guidance.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 

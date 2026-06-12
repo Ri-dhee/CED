@@ -252,6 +252,7 @@ export function useGRMEFramework() {
         else if (field === "shortName") updated.shortName = value;
         else if (field === "id") updated.id = value;
         else if (field === "description") updated.description = value;
+        else if (field === "methodologyNote") updated.methodologyNote = value;
         else if (field === "color") updated.color = value;
         else if (field === "icon") updated.icon = value;
         return updated;
@@ -327,6 +328,8 @@ export function useGRMEFramework() {
                   return { ...ind, description: value };
                 if (field === "source")
                   return { ...ind, source: value || undefined };
+                if (field === "validationStatus")
+                  return { ...ind, validationStatus: value as Indicator["validationStatus"] };
                 if (field.startsWith("benchmark.")) {
                   const key = field.split(".")[1] as
                     | "critical"

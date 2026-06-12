@@ -334,6 +334,7 @@ export function newDomain(): Domain {
     name: "",
     shortName: "",
     description: "",
+    methodologyNote: "",
     icon: "shield",
     color: "#6366f1",
     subdomains: [],
@@ -363,6 +364,7 @@ export function newIndicator(): Indicator {
       exemplary: "75",
     },
     direction: "higher" as Direction,
+    validationStatus: "draft",
   };
 }
 

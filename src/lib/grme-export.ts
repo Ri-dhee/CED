@@ -1,4 +1,11 @@
-import { Domain, CityData, AssessmentYear, calculateIndicatorScore } from "./grme-data";
+import {
+  Domain,
+  CityData,
+  AssessmentYear,
+  calculateIndicatorScore,
+  calculateDomainScore,
+  calculateWeightedOverallScore,
+} from "./grme-data";
 
 // ── CSV Helpers ─────────────────────────────────────────────────
 
@@ -67,8 +74,8 @@ export function exportYearCsv(
       for (const indicator of sub.indicators) {
         const data = assessment?.indicators[indicator.id];
         const score =
-          data?.value !== undefined && data?.value !== null && typeof data?.value === "number"
-            ? calculateIndicatorScore(data.value, indicator)
+          data?.value !== undefined && data?.value !== null && typeof data?.value !== "string"
+            ? calculateIndicatorScore(data.value as number | boolean, indicator)
             : null;
 
         rows.push([
@@ -130,8 +137,8 @@ export function exportAllYearsCsv(
         for (const indicator of sub.indicators) {
           const data = assessment?.indicators[indicator.id];
           const score =
-            data?.value !== undefined && data?.value !== null && typeof data?.value === "number"
-              ? calculateIndicatorScore(data.value, indicator)
+            data?.value !== undefined && data?.value !== null && typeof data?.value !== "string"
+              ? calculateIndicatorScore(data.value as number | boolean, indicator)
               : null;
 
           rows.push([
@@ -181,21 +188,14 @@ export function exportSummaryCsv(
     };
 
     const domainScores = domains.map((domain) => {
-      const scores: number[] = [];
-      for (const sub of domain.subdomains) {
-        for (const ind of sub.indicators) {
-          const s = getScore(ind.id);
-          if (s !== null) scores.push(s);
-        }
-      }
-      return scores.length > 0
-        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-        : 50;
+      return Math.round(calculateDomainScore(domain, getScore));
     });
 
-    const overall = Math.round(
-      domainScores.reduce((a, b) => a + b, 0) / domainScores.length
-    );
+    const overall = Math.round(calculateWeightedOverallScore(domains, (domainId) => {
+      const domain = domains.find((d) => d.id === domainId);
+      if (!domain) return 50;
+      return calculateDomainScore(domain, getScore);
+    }));
 
     rows.push([
       escapeCsv(year),

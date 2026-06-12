@@ -32,6 +32,7 @@ export interface Indicator {
   direction: Direction;
   source?: string;
   weight?: number;
+  validationStatus?: "draft" | "reviewed" | "validated";
 }
 
 export interface SubDomain {
@@ -47,6 +48,7 @@ export interface Domain {
   name: string;
   shortName: string;
   description: string;
+  methodologyNote?: string;
   icon: string;
   color: string;
   subdomains: SubDomain[];

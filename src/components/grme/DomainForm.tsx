@@ -163,6 +163,19 @@ export default function DomainForm({ domain, onSave, onCancel }: DomainFormProps
         />
       </div>
 
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">
+          Methodology Note
+        </label>
+        <textarea
+          value={data.methodologyNote || ""}
+          onChange={(e) => setData({ ...data, methodologyNote: e.target.value })}
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+          placeholder="Explain how this domain should be interpreted or weighted..."
+        />
+      </div>
+
       <div className="flex justify-end gap-2 pt-2">
         <button
           type="button"

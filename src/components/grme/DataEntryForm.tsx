@@ -108,6 +108,11 @@ export default function DataEntryForm({
             >
               {indicator.type}
             </span>
+            {indicator.validationStatus && indicator.validationStatus !== "validated" && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                {indicator.validationStatus === "draft" ? "Needs review" : "Reviewed"}
+              </span>
+            )}
             {lowerBetter && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-500">
                 Lower is better
@@ -116,6 +121,11 @@ export default function DataEntryForm({
           </div>
           <p className="text-sm font-medium text-gray-800">{indicator.name}</p>
           <p className="text-xs text-gray-400 mt-0.5">{indicator.description}</p>
+          {indicator.validationStatus === "draft" && (
+            <p className="text-[10px] text-amber-600 mt-1">
+              This indicator is a draft and should be reviewed by an expert before final use.
+            </p>
+          )}
         </div>
         {status && (
           <div className="shrink-0 text-center">

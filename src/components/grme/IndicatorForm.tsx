@@ -28,6 +28,7 @@ const DATA_TYPES: DataType[] = [
   "boolean",
 ];
 const DIRECTIONS: Direction[] = ["higher", "lower"];
+const VALIDATION_STATUSES = ["draft", "reviewed", "validated"] as const;
 
 export default function IndicatorForm({
   indicator,
@@ -203,7 +204,7 @@ export default function IndicatorForm({
 
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">
-            Weight (optional)
+            Importance Weight (optional)
           </label>
           <input
             type="number"
@@ -222,6 +223,32 @@ export default function IndicatorForm({
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             placeholder="Default: equal"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Validation
+          </label>
+          <select
+            value={data.validationStatus || "draft"}
+            onChange={(e) =>
+              setData({
+                ...data,
+                validationStatus: e.target.value as Indicator["validationStatus"],
+              })
+            }
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            {VALIDATION_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status === "draft"
+                  ? "Draft"
+                  : status === "reviewed"
+                    ? "Reviewed"
+                    : "Validated"}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="sm:col-span-2">
