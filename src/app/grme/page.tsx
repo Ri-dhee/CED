@@ -4,10 +4,9 @@ import { useState, useMemo } from "react";
 import {
   DOMAINS,
   CITIES,
-  getStatus,
+  getStatusFromScore,
   getStatusColor,
   getStatusBg,
-  getStatusScore,
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import RadarChart from "@/components/RadarChart";
@@ -50,7 +49,8 @@ export default function GRMEPage() {
 
   const overallScore = getOverallScore();
   const stats = getDataEntryStats();
-  const overallColor = getStatusColor(getStatus(overallScore, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
+  const overallStatus = getStatusFromScore(overallScore);
+  const overallColor = getStatusColor(overallStatus);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
@@ -158,8 +158,8 @@ export default function GRMEPage() {
                 <div className="space-y-3">
                   {DOMAINS.map((domain) => {
                     const score = domainScores[domain.id];
-                    const color = getStatusColor(getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
-                    const status = getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any);
+                    const status = getStatusFromScore(score);
+                    const color = getStatusColor(status);
                     const filled = domain.subdomains.flatMap((s) => s.indicators).filter((i) => cityData.indicators[i.id]?.value !== undefined).length;
                     const total = domain.subdomains.flatMap((s) => s.indicators).length;
 
@@ -265,7 +265,8 @@ export default function GRMEPage() {
                     <div className="space-y-1.5">
                       {DOMAINS.map((domain) => {
                         const score = domainScores[domain.id];
-                        const color = getStatusColor(getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
+                        const status = getStatusFromScore(score);
+                        const color = getStatusColor(status);
                         const filled = domain.subdomains.flatMap((s) => s.indicators).filter((i) => cityData.indicators[i.id]?.value !== undefined).length;
                         const total = domain.subdomains.flatMap((s) => s.indicators).length;
 
@@ -319,15 +320,9 @@ export default function GRMEPage() {
                     </p>
                     <div className="space-y-1.5">
                       {currentDomain.subdomains.map((sub) => {
-                        const subScore =
-                          sub.indicators.reduce((sum, ind) => {
-                            const data = cityData.indicators[ind.id];
-                            if (data && typeof data.value === "number") {
-                              return sum + getStatusScore(getStatus(data.value, ind));
-                            }
-                            return sum + 50;
-                          }, 0) / sub.indicators.length;
-                        const color = getStatusColor(getStatus(subScore, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
+                        const subScore = getDomainScore(currentDomain.id);
+                        const status = getStatusFromScore(subScore);
+                        const color = getStatusColor(status);
 
                         return (
                           <button

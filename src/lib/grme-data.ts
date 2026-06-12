@@ -1,6 +1,7 @@
 export type IndicatorType = "Quantitative" | "Qualitative" | "Participatory";
 export type DataType = "percentage" | "number" | "ratio" | "index" | "text" | "boolean";
 export type ScoreStatus = "Critical" | "Developing" | "Progressive" | "Exemplary";
+export type Direction = "higher" | "lower"; // higher = better, lower = better
 
 export interface AuditEntry {
   id: string;
@@ -28,13 +29,16 @@ export interface Indicator {
   unit: string;
   description: string;
   benchmark: Benchmark;
+  direction: Direction;
   source?: string;
+  weight?: number;
 }
 
 export interface SubDomain {
   id: string;
   name: string;
   indicators: Indicator[];
+  weight?: number;
 }
 
 export interface Domain {
@@ -45,6 +49,7 @@ export interface Domain {
   icon: string;
   color: string;
   subdomains: SubDomain[];
+  weight?: number;
 }
 
 export interface IndicatorData {
@@ -69,21 +74,73 @@ export interface CityData {
   auditLog: AuditLog[];
 }
 
-export function getStatus(value: number, indicator: Indicator): ScoreStatus {
+/**
+ * Calculate indicator score using linear interpolation between benchmark thresholds.
+ *
+ * For "higher is better" indicators:
+ *   - value <= critical → score 0
+ *   - value >= exemplary → score 100
+ *   - Linear interpolation between thresholds
+ *
+ * For "lower is better" indicators (inverted):
+ *   - value >= critical → score 0
+ *   - value <= exemplary → score 100
+ *   - Linear interpolation between thresholds (inverted)
+ */
+export function calculateIndicatorScore(value: number, indicator: Indicator): number {
   const b = indicator.benchmark;
-  if (value >= parseFloat(b.exemplary)) return "Exemplary";
-  if (value >= parseFloat(b.progressive)) return "Progressive";
-  if (value >= parseFloat(b.developing)) return "Developing";
+  const critical = parseFloat(b.critical);
+  const developing = parseFloat(b.developing);
+  const progressive = parseFloat(b.progressive);
+  const exemplary = parseFloat(b.exemplary);
+
+  if (indicator.direction === "higher") {
+    // Higher value = better score
+    if (value <= critical) return 0;
+    if (value >= exemplary) return 100;
+    if (value < developing) {
+      // Interpolate between 0-25
+      return ((value - critical) / (developing - critical)) * 25;
+    }
+    if (value < progressive) {
+      // Interpolate between 25-50
+      return 25 + ((value - developing) / (progressive - developing)) * 25;
+    }
+    // Interpolate between 50-75-100
+    return 50 + ((value - progressive) / (exemplary - progressive)) * 50;
+  } else {
+    // Lower value = better score (inverted scale)
+    if (value >= critical) return 0;
+    if (value <= exemplary) return 100;
+    if (value > developing) {
+      // Interpolate between 0-25 (value going down = score going up)
+      return ((critical - value) / (critical - developing)) * 25;
+    }
+    if (value > progressive) {
+      // Interpolate between 25-50
+      return 25 + ((developing - value) / (developing - progressive)) * 25;
+    }
+    // Interpolate between 50-100
+    return 50 + ((progressive - value) / (progressive - exemplary)) * 50;
+  }
+}
+
+/**
+ * Get status label from score (0-100)
+ */
+export function getStatusFromScore(score: number): ScoreStatus {
+  if (score >= 75) return "Exemplary";
+  if (score >= 50) return "Progressive";
+  if (score >= 25) return "Developing";
   return "Critical";
 }
 
-export function getStatusScore(status: ScoreStatus): number {
-  switch (status) {
-    case "Critical": return 12.5;
-    case "Developing": return 37.5;
-    case "Progressive": return 62.5;
-    case "Exemplary": return 87.5;
-  }
+/**
+ * Get status for an indicator value
+ */
+export function getStatus(value: number, indicator: Indicator): ScoreStatus {
+  const score = calculateIndicatorScore(value, indicator);
+  return getStatusFromScore(score);
 }
 
 export function getStatusColor(status: ScoreStatus): string {
@@ -102,6 +159,52 @@ export function getStatusBg(status: ScoreStatus): string {
     case "Progressive": return "#eff6ff";
     case "Exemplary": return "#ecfdf5";
   }
+}
+
+/**
+ * Calculate domain score using weighted average of indicator scores.
+ * Each indicator contributes equally unless weights are specified.
+ */
+export function calculateDomainScore(
+  domain: Domain,
+  getIndicatorScore: (id: string) => number | null
+): number {
+  const allIndicators = domain.subdomains.flatMap((s) => s.indicators);
+  const scores = allIndicators
+    .map((ind) => getIndicatorScore(ind.id))
+    .filter((s): s is number => s !== null);
+
+  if (scores.length === 0) return 50; // Default when no data entered
+  return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+
+/**
+ * Calculate overall score using equal domain weights.
+ */
+export function calculateOverallScore(
+  getDomainScore: (id: string) => number
+): number {
+  const scores = DOMAINS.map((d) => getDomainScore(d.id));
+  return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+
+/**
+ * Get benchmark thresholds as numeric values
+ */
+export function getBenchmarkValues(indicator: Indicator) {
+  return {
+    critical: parseFloat(indicator.benchmark.critical),
+    developing: parseFloat(indicator.benchmark.developing),
+    progressive: parseFloat(indicator.benchmark.progressive),
+    exemplary: parseFloat(indicator.benchmark.exemplary),
+  };
+}
+
+/**
+ * Check if an indicator is "lower is better"
+ */
+export function isLowerBetter(indicator: Indicator): boolean {
+  return indicator.direction === "lower";
 }
 
 export const DOMAINS: Domain[] = [
@@ -125,6 +228,8 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Measures perceived safety in public spaces after dark",
             benchmark: { critical: "0", developing: "30", progressive: "50", exemplary: "70" },
+            direction: "higher",
+            source: "UN Women SDG 11 Gender Snapshot",
           },
           {
             id: "ss-2",
@@ -134,6 +239,8 @@ export const DOMAINS: Domain[] = [
             unit: "per 10k",
             description: "Reported GBV cases (lower is better)",
             benchmark: { critical: "50", developing: "30", progressive: "15", exemplary: "5" },
+            direction: "lower",
+            source: "Bhutan National Strategy on GBV 2024-2028",
           },
           {
             id: "ss-3",
@@ -143,6 +250,8 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Infrastructure safety measure",
             benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
+            direction: "higher",
+            source: "World Bank Handbook for Gender-Inclusive Urban Planning",
           },
           {
             id: "ss-4",
@@ -152,6 +261,8 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Survey-based perception score",
             benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
+            direction: "higher",
+            source: "UN Women Towards a Gender-Inclusive Urban Future",
           },
           {
             id: "ss-5",
@@ -161,6 +272,7 @@ export const DOMAINS: Domain[] = [
             unit: "per 10km",
             description: "Emergency response infrastructure density",
             benchmark: { critical: "0", developing: "2", progressive: "5", exemplary: "10" },
+            direction: "higher",
           },
         ],
       },
@@ -176,6 +288,8 @@ export const DOMAINS: Domain[] = [
             unit: "per 10k",
             description: "Access to GBV support services",
             benchmark: { critical: "0", developing: "0.5", progressive: "1", exemplary: "2" },
+            direction: "higher",
+            source: "Bhutan National Strategy on GBV 2024-2028",
           },
           {
             id: "ss-7",
@@ -185,6 +299,7 @@ export const DOMAINS: Domain[] = [
             unit: "minutes",
             description: "Institutional responsiveness (lower is better)",
             benchmark: { critical: "120", developing: "60", progressive: "30", exemplary: "15" },
+            direction: "lower",
           },
           {
             id: "ss-8",
@@ -194,6 +309,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Justice system effectiveness",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "75" },
+            direction: "higher",
           },
           {
             id: "ss-9",
@@ -203,6 +319,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Knowledge of available support",
             benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
         ],
       },
@@ -218,6 +335,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Digital violence prevalence (lower is better)",
             benchmark: { critical: "50", developing: "30", progressive: "15", exemplary: "5" },
+            direction: "lower",
           },
           {
             id: "ss-11",
@@ -227,6 +345,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "0=Non-existent, 10=Fully enforced",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
           {
             id: "ss-12",
@@ -236,6 +355,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Awareness of digital safety resources",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
         ],
       },
@@ -261,6 +381,8 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Transit accessibility",
             benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
+            direction: "higher",
+            source: "World Bank Handbook for Gender-Inclusive Urban Planning",
           },
           {
             id: "ma-2",
@@ -270,6 +392,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "User satisfaction metric",
             benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
+            direction: "higher",
           },
           {
             id: "ma-3",
@@ -279,6 +402,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Transport cost burden (lower is better)",
             benchmark: { critical: "25", developing: "15", progressive: "10", exemplary: "5" },
+            direction: "lower",
           },
           {
             id: "ma-4",
@@ -288,6 +412,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Gender-responsive transport features",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -303,6 +428,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Mountain-adapted pedestrian infrastructure",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "ma-6",
@@ -312,6 +438,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Accessibility infrastructure",
             benchmark: { critical: "0", developing: "10", progressive: "30", exemplary: "60" },
+            direction: "higher",
           },
           {
             id: "ma-7",
@@ -321,6 +448,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Walkability metric",
             benchmark: { critical: "0", developing: "30", progressive: "60", exemplary: "85" },
+            direction: "higher",
           },
         ],
       },
@@ -336,6 +464,7 @@ export const DOMAINS: Domain[] = [
             unit: "min",
             description: "Care trip efficiency (lower is better)",
             benchmark: { critical: "60", developing: "40", progressive: "25", exemplary: "15" },
+            direction: "lower",
           },
           {
             id: "ma-9",
@@ -345,6 +474,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Planning integration of care needs",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "ma-10",
@@ -354,6 +484,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Lived experience (lower is better)",
             benchmark: { critical: "8", developing: "6", progressive: "4", exemplary: "2" },
+            direction: "lower",
           },
         ],
       },
@@ -379,6 +510,8 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Land ownership security",
             benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
+            direction: "higher",
+            source: "World Bank Bhutan Gender Policy Note",
           },
           {
             id: "hl-2",
@@ -388,6 +521,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Property registration metrics",
             benchmark: { critical: "0", developing: "15", progressive: "30", exemplary: "50" },
+            direction: "higher",
           },
           {
             id: "hl-3",
@@ -397,6 +531,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "0=Major barriers, 10=No barriers",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
           {
             id: "hl-4",
@@ -406,6 +541,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Policy inclusiveness",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
         ],
       },
@@ -421,6 +557,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Housing cost burden (lower is better)",
             benchmark: { critical: "60", developing: "40", progressive: "25", exemplary: "10" },
+            direction: "lower",
           },
           {
             id: "hl-6",
@@ -430,6 +567,7 @@ export const DOMAINS: Domain[] = [
             unit: "ratio",
             description: "Persons per room (lower is better)",
             benchmark: { critical: "3", developing: "2", progressive: "1.5", exemplary: "1" },
+            direction: "lower",
           },
           {
             id: "hl-7",
@@ -439,6 +577,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Basic services access",
             benchmark: { critical: "0", developing: "40", progressive: "70", exemplary: "95" },
+            direction: "higher",
           },
           {
             id: "hl-8",
@@ -448,6 +587,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Housing availability for migrant women",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -463,6 +603,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Climate-resilient housing",
             benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
+            direction: "higher",
           },
           {
             id: "hl-10",
@@ -472,6 +613,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Participation in resilience planning",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "hl-11",
@@ -481,6 +623,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Awareness of protection mechanisms",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
         ],
       },
@@ -506,6 +649,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Pay equity (lower is better)",
             benchmark: { critical: "40", developing: "25", progressive: "15", exemplary: "5" },
+            direction: "lower",
           },
           {
             id: "ei-2",
@@ -515,6 +659,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Leadership representation",
             benchmark: { critical: "0", developing: "10", progressive: "20", exemplary: "35" },
+            direction: "higher",
           },
           {
             id: "ei-3",
@@ -524,6 +669,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Social safety net coverage",
             benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "60" },
+            direction: "higher",
           },
           {
             id: "ei-4",
@@ -533,6 +679,7 @@ export const DOMAINS: Domain[] = [
             unit: "hrs",
             description: "Care work burden gap (lower is better)",
             benchmark: { critical: "6", developing: "4", progressive: "2", exemplary: "1" },
+            direction: "lower",
           },
         ],
       },
@@ -548,6 +695,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Financial inclusion",
             benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
+            direction: "higher",
           },
           {
             id: "ei-6",
@@ -557,6 +705,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Government support accessibility",
             benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "55" },
+            direction: "higher",
           },
           {
             id: "ei-7",
@@ -566,6 +715,7 @@ export const DOMAINS: Domain[] = [
             unit: "per 10k",
             description: "Collective economic empowerment",
             benchmark: { critical: "0", developing: "1", progressive: "3", exemplary: "6" },
+            direction: "higher",
           },
           {
             id: "ei-8",
@@ -575,6 +725,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Digital financial inclusion",
             benchmark: { critical: "0", developing: "20", progressive: "45", exemplary: "70" },
+            direction: "higher",
           },
         ],
       },
@@ -590,6 +741,7 @@ export const DOMAINS: Domain[] = [
             unit: "per 1k",
             description: "Childcare accessibility",
             benchmark: { critical: "0", developing: "0.5", progressive: "1", exemplary: "2" },
+            direction: "higher",
           },
           {
             id: "ei-10",
@@ -599,6 +751,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Workplace support infrastructure",
             benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
+            direction: "higher",
           },
           {
             id: "ei-11",
@@ -608,6 +761,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "0=No barriers, 10=Major barriers",
             benchmark: { critical: "8", developing: "6", progressive: "4", exemplary: "2" },
+            direction: "lower",
           },
         ],
       },
@@ -633,6 +787,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Healthcare accessibility",
             benchmark: { critical: "0", developing: "30", progressive: "50", exemplary: "75" },
+            direction: "higher",
           },
           {
             id: "hs-2",
@@ -642,6 +797,8 @@ export const DOMAINS: Domain[] = [
             unit: "per 100k",
             description: "Maternal health outcome (lower is better)",
             benchmark: { critical: "300", developing: "150", progressive: "70", exemplary: "30" },
+            direction: "lower",
+            source: "WHO Global Maternal Health Standards",
           },
           {
             id: "hs-3",
@@ -651,6 +808,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Reproductive health access",
             benchmark: { critical: "0", developing: "30", progressive: "55", exemplary: "75" },
+            direction: "higher",
           },
           {
             id: "hs-4",
@@ -660,6 +818,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Infrastructure assessment",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -675,6 +834,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Mental health burden (lower is better)",
             benchmark: { critical: "40", developing: "25", progressive: "15", exemplary: "8" },
+            direction: "lower",
           },
           {
             id: "hs-6",
@@ -684,6 +844,7 @@ export const DOMAINS: Domain[] = [
             unit: "per 10k",
             description: "Service capacity",
             benchmark: { critical: "0", developing: "0.5", progressive: "1", exemplary: "2" },
+            direction: "higher",
           },
           {
             id: "hs-7",
@@ -693,6 +854,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Service quality perception",
             benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
+            direction: "higher",
           },
           {
             id: "hs-8",
@@ -702,6 +864,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Integrated service delivery",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -717,6 +880,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Gender-responsive WASH",
             benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
+            direction: "higher",
           },
           {
             id: "hs-10",
@@ -726,6 +890,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Water access equity",
             benchmark: { critical: "0", developing: "40", progressive: "70", exemplary: "95" },
+            direction: "higher",
           },
           {
             id: "hs-11",
@@ -735,6 +900,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Education facility WASH",
             benchmark: { critical: "0", developing: "30", progressive: "60", exemplary: "90" },
+            direction: "higher",
           },
         ],
       },
@@ -760,6 +926,8 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Political representation",
             benchmark: { critical: "0", developing: "15", progressive: "30", exemplary: "40" },
+            direction: "higher",
+            source: "UNDP Bhutan NAP GEPA",
           },
           {
             id: "gv-2",
@@ -769,6 +937,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Committee gender balance",
             benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "60" },
+            direction: "higher",
           },
           {
             id: "gv-3",
@@ -778,6 +947,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Administrative leadership",
             benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "40" },
+            direction: "higher",
           },
           {
             id: "gv-4",
@@ -787,6 +957,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Voice and influence",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "8" },
+            direction: "higher",
           },
         ],
       },
@@ -802,6 +973,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Inclusive planning process",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "gv-6",
@@ -811,6 +983,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Civic participation",
             benchmark: { critical: "0", developing: "15", progressive: "30", exemplary: "45" },
+            direction: "higher",
           },
           {
             id: "gv-7",
@@ -820,6 +993,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Budget inclusiveness",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
           {
             id: "gv-8",
@@ -829,6 +1003,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Safety-integrated planning",
             benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
+            direction: "higher",
           },
         ],
       },
@@ -844,6 +1019,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Data gender responsiveness",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "gv-10",
@@ -853,6 +1029,7 @@ export const DOMAINS: Domain[] = [
             unit: "per year",
             description: "Monitoring frequency",
             benchmark: { critical: "0", developing: "1", progressive: "2", exemplary: "4" },
+            direction: "higher",
           },
           {
             id: "gv-11",
@@ -862,6 +1039,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Data infrastructure",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -887,6 +1065,8 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Early warning coverage",
             benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
+            direction: "higher",
+            source: "Sendai Framework for DRR",
           },
           {
             id: "cr-2",
@@ -896,6 +1076,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "DRR capacity building",
             benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
+            direction: "higher",
           },
           {
             id: "cr-3",
@@ -905,6 +1086,8 @@ export const DOMAINS: Domain[] = [
             unit: "ratio",
             description: "1=equal, >1=women more affected (lower is better)",
             benchmark: { critical: "2", developing: "1.5", progressive: "1.2", exemplary: "1" },
+            direction: "lower",
+            source: "Shillington et al. 2021",
           },
           {
             id: "cr-4",
@@ -914,6 +1097,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "DRR governance participation",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -929,6 +1113,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Adaptation program reach",
             benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "60" },
+            direction: "higher",
           },
           {
             id: "cr-6",
@@ -938,6 +1123,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Knowledge and adoption",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "8" },
+            direction: "higher",
           },
           {
             id: "cr-7",
@@ -947,6 +1133,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Green economy access",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -962,6 +1149,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Gender-responsive green design",
             benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
+            direction: "higher",
           },
           {
             id: "cr-9",
@@ -971,6 +1159,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Green space utilization",
             benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
+            direction: "higher",
           },
           {
             id: "cr-10",
@@ -980,6 +1169,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Environmental participation",
             benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "45" },
+            direction: "higher",
           },
         ],
       },
@@ -1005,6 +1195,8 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "GNH wellbeing metric",
             benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
+            direction: "higher",
+            source: "Centre for Bhutan Studies & GNH Research",
           },
           {
             id: "ci-2",
@@ -1014,6 +1206,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Cultural programming equity",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "ci-3",
@@ -1023,6 +1216,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Social acceptance metric",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "8" },
+            direction: "higher",
           },
         ],
       },
@@ -1038,6 +1232,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Knowledge integration",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
           {
             id: "ci-5",
@@ -1047,6 +1242,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Cultural preservation equity",
             benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
+            direction: "higher",
           },
           {
             id: "ci-6",
@@ -1056,6 +1252,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Diverse representation",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },
@@ -1071,6 +1268,7 @@ export const DOMAINS: Domain[] = [
             unit: "pts",
             description: "Attitudinal change (higher is better)",
             benchmark: { critical: "0", developing: "1", progressive: "3", exemplary: "5" },
+            direction: "higher",
           },
           {
             id: "ci-8",
@@ -1080,6 +1278,7 @@ export const DOMAINS: Domain[] = [
             unit: "%",
             description: "Education integration",
             benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
+            direction: "higher",
           },
           {
             id: "ci-9",
@@ -1089,6 +1288,7 @@ export const DOMAINS: Domain[] = [
             unit: "/10",
             description: "Media representation",
             benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
+            direction: "higher",
           },
         ],
       },

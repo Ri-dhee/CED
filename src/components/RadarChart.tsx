@@ -1,6 +1,6 @@
 "use client";
 
-import { DOMAINS, getStatusColor, getStatusScore, getStatus } from "@/lib/grme-data";
+import { DOMAINS, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
 
 interface RadarChartProps {
   getDomainScore: (domainId: string) => number;
@@ -40,7 +40,7 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
   });
 
   const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const avgStatus = getStatus(avgScore, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any);
+  const avgStatus = getStatusFromScore(avgScore);
 
   return (
     <div className="relative">
@@ -85,7 +85,8 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
         {DOMAINS.map((domain, i) => {
           const score = scores[i];
           const point = getPoint(i, score);
-          const color = getStatusColor(getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
+          const status = getStatusFromScore(score);
+          const color = getStatusColor(status);
           return (
             <g key={domain.id}>
               <circle
@@ -103,7 +104,8 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
         {DOMAINS.map((domain, i) => {
           const point = getPoint(i, 125);
           const score = Math.round(scores[i]);
-          const color = getStatusColor(getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
+          const status = getStatusFromScore(score);
+          const color = getStatusColor(status);
           return (
             <g key={domain.id}>
               <text

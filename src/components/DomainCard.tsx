@@ -1,6 +1,6 @@
 "use client";
 
-import { Domain, getStatus, getStatusColor, getStatusBg, getStatusScore } from "@/lib/grme-data";
+import { Domain, getStatusFromScore, getStatusColor, getStatusBg } from "@/lib/grme-data";
 
 interface DomainCardProps {
   domain: Domain;
@@ -62,7 +62,7 @@ export default function DomainCard({
   filledCount,
   totalCount,
 }: DomainCardProps) {
-  const status = getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any);
+  const status = getStatusFromScore(score);
   const color = getStatusColor(status);
 
   return (

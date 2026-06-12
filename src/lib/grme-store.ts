@@ -7,8 +7,9 @@ import {
   AuditEntry,
   AuditLog,
   DOMAINS,
-  getStatus,
-  getStatusScore,
+  calculateIndicatorScore,
+  calculateDomainScore,
+  getStatusFromScore,
 } from "./grme-data";
 
 const STORAGE_KEY = "grme-data";
@@ -31,6 +32,16 @@ function loadAllData(): Record<string, CityData> {
 function saveAllData(data: Record<string, CityData>): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function findIndicator(indicatorId: string) {
+  for (const domain of DOMAINS) {
+    for (const sub of domain.subdomains) {
+      const ind = sub.indicators.find((i) => i.id === indicatorId);
+      if (ind) return ind;
+    }
+  }
+  return null;
 }
 
 export function useGRMEData() {
@@ -156,23 +167,27 @@ export function useGRMEData() {
     [cityData, allData, selectedCity]
   );
 
+  const getIndicatorScore = useCallback(
+    (indicatorId: string): number | null => {
+      const data = cityData.indicators[indicatorId];
+      if (data === undefined || data.value === null || data.value === undefined) {
+        return null;
+      }
+      const indicator = findIndicator(indicatorId);
+      if (!indicator) return null;
+      if (typeof data.value === "string") return null;
+      return calculateIndicatorScore(data.value, indicator);
+    },
+    [cityData]
+  );
+
   const getDomainScore = useCallback(
     (domainId: string): number => {
       const domain = DOMAINS.find((d) => d.id === domainId);
       if (!domain) return 50;
-      const allIndicators = domain.subdomains.flatMap((s) => s.indicators);
-      if (allIndicators.length === 0) return 50;
-      const scores = allIndicators.map((ind) => {
-        const data = cityData.indicators[ind.id];
-        if (data && typeof data.value === "number") {
-          const status = getStatus(data.value, ind);
-          return getStatusScore(status);
-        }
-        return 50;
-      });
-      return scores.reduce((a, b) => a + b, 0) / scores.length;
+      return calculateDomainScore(domain, getIndicatorScore);
     },
-    [cityData]
+    [getIndicatorScore]
   );
 
   const getOverallScore = useCallback((): number => {
@@ -201,6 +216,7 @@ export function useGRMEData() {
     setSelectedCity,
     updateIndicator,
     addAuditNote,
+    getIndicatorScore,
     getDomainScore,
     getOverallScore,
     getDataEntryStats,

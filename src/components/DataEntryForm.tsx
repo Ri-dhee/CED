@@ -3,9 +3,11 @@
 import { useState } from "react";
 import {
   Indicator,
-  getStatus,
+  calculateIndicatorScore,
+  getStatusFromScore,
   getStatusColor,
   getStatusBg,
+  isLowerBetter,
 } from "@/lib/grme-data";
 
 interface DataEntryFormProps {
@@ -32,13 +34,15 @@ export default function DataEntryForm({
       ? NaN
       : parseFloat(inputValue);
 
-  const status =
-    !isNaN(numericValue)
-      ? getStatus(numericValue, indicator)
-      : null;
+  const score = !isNaN(numericValue)
+    ? calculateIndicatorScore(numericValue, indicator)
+    : null;
 
+  const status = score !== null ? getStatusFromScore(score) : null;
   const color = status ? getStatusColor(status) : "#9ca3af";
   const bg = status ? getStatusBg(status) : "#f9fafb";
+
+  const lowerBetter = isLowerBetter(indicator);
 
   const handleSubmit = () => {
     if (indicator.dataType === "text" || indicator.dataType === "boolean") {
@@ -48,18 +52,7 @@ export default function DataEntryForm({
     }
   };
 
-  const isLowerBetter = indicator.name.toLowerCase().includes("gap") ||
-    indicator.name.toLowerCase().includes("mortality") ||
-    indicator.name.toLowerCase().includes("prevalence") ||
-    indicator.name.toLowerCase().includes("burden") ||
-    indicator.name.toLowerCase().includes("difficulty") ||
-    indicator.name.toLowerCase().includes("barriers") ||
-    indicator.name.toLowerCase().includes("cost") ||
-    indicator.name.toLowerCase().includes("overcrowding") ||
-    indicator.name.toLowerCase().includes("spending") ||
-    indicator.name.toLowerCase().includes("harassment") ||
-    indicator.name.toLowerCase().includes("response time") ||
-    indicator.name.toLowerCase().includes("travel time");
+  const b = indicator.benchmark;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -85,8 +78,8 @@ export default function DataEntryForm({
             >
               {indicator.type}
             </span>
-            {isLowerBetter && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+            {lowerBetter && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-500">
                 Lower is better
               </span>
             )}
@@ -95,12 +88,17 @@ export default function DataEntryForm({
           <p className="text-xs text-gray-400 mt-0.5">{indicator.description}</p>
         </div>
         {status && (
-          <span
-            className="text-xs font-bold px-2 py-1 rounded-lg shrink-0"
-            style={{ backgroundColor: bg, color }}
-          >
-            {status}
-          </span>
+          <div className="shrink-0 text-center">
+            <span
+              className="text-xs font-bold px-2 py-1 rounded-lg block"
+              style={{ backgroundColor: bg, color }}
+            >
+              {status}
+            </span>
+            <span className="text-[10px] text-gray-400 mt-1 block">
+              {Math.round(score!)} pts
+            </span>
+          </div>
         )}
       </div>
 
@@ -168,7 +166,7 @@ export default function DataEntryForm({
                     >
                       <div className="font-semibold capitalize">{level}</div>
                       <div className="opacity-75">
-                        {indicator.benchmark[level]}{indicator.unit}
+                        {b[level]}{indicator.unit}
                       </div>
                     </div>
                   );
