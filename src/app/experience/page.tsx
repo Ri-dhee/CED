@@ -52,15 +52,15 @@ const experiences = [
 export default function Experience() {
   return (
     <div>
-      <section className="relative pt-40 pb-28 bg-gradient-to-br from-slate-50 via-white to-emerald-50 overflow-hidden">
+      <section className="relative pt-28 sm:pt-40 pb-16 sm:pb-28 bg-gradient-to-br from-slate-50 via-white to-emerald-50 overflow-hidden">
         <div className="hero-glow top-0 left-0" />
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
-            <span className="text-sm font-semibold text-primary uppercase tracking-widest">Our Track Record</span>
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mt-4 mb-6">
+            <span className="text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest">Our Track Record</span>
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Decades of <span className="gradient-text">Proven Impact</span>
             </h1>
-            <p className="text-lg text-gray-500 leading-relaxed">
+            <p className="text-base sm:text-lg text-gray-500 leading-relaxed">
               Over a decade of delivering impactful environmental and development
               solutions across the globe. Each project reflects our commitment to
               excellence and sustainability.
@@ -69,13 +69,13 @@ export default function Experience() {
         </div>
       </section>
 
-      <section className="py-24 bg-white">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid grid-cols-1 gap-8">
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-4 sm:gap-8">
             {experiences.map((exp, i) => (
               <div
                 key={i}
-                className="group relative bg-white rounded-2xl border border-gray-100 p-8 hover:shadow-xl hover:border-primary/20 transition-all hover:-translate-y-0.5"
+                className="group relative bg-white rounded-2xl border border-gray-100 p-5 sm:p-8 hover:shadow-xl hover:border-primary/20 transition-all hover:-translate-y-0.5"
               >
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
                   <div className="md:w-48 shrink-0">

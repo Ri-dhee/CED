@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { Analytics } from "@vercel/analytics/react";
+import MobileNav from "@/components/MobileNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -91,10 +92,10 @@ export default function RootLayout({
           Skip to content
         </a>
         <header className="fixed top-0 left-0 right-0 z-50 glass" role="banner">
-          <nav className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between" aria-label="Main navigation">
-            <Link href="/" className="flex items-center gap-3 group" aria-label="CED Home">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-light rounded-xl flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow">
-                <span className="text-white font-bold text-base" aria-hidden="true">CED</span>
+          <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between" aria-label="Main navigation">
+            <Link href="/" className="flex items-center gap-2 sm:gap-3 group" aria-label="CED Home">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-primary to-primary-light rounded-xl flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow">
+                <span className="text-white font-bold text-sm sm:text-base" aria-hidden="true">CED</span>
               </div>
               <div className="hidden sm:block">
                 <span className="font-bold text-gray-900 block leading-tight">
@@ -103,7 +104,7 @@ export default function RootLayout({
                 <span className="text-xs text-gray-500">& Development</span>
               </div>
             </Link>
-            <div className="flex items-center gap-1" role="menubar">
+            <div className="hidden lg:flex items-center gap-1" role="menubar">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -115,12 +116,13 @@ export default function RootLayout({
                 </Link>
               ))}
             </div>
+            <MobileNav />
           </nav>
         </header>
         <main id="main-content" className="flex-1" tabIndex={-1}>{children}</main>
         <footer className="bg-gradient-to-br from-primary-deeper via-primary-dark to-primary-deeper text-white" role="contentinfo">
-          <div className="max-w-7xl mx-auto px-6 py-16">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
               <div className="lg:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur">
