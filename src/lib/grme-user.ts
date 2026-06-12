@@ -11,6 +11,8 @@ export interface GrmeUser {
 }
 
 const STORAGE_KEY = "grme-user";
+const ADMIN_PASSWORD_HASH =
+  process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH || "";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Admin",
@@ -42,6 +44,28 @@ export function canReviewProposals(role: UserRole): boolean {
   return role === "admin";
 }
 
+// ── Password Verification (SHA-256 via Web Crypto) ──────────────
+
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function verifyAdminPassword(password: string): Promise<boolean> {
+  if (!ADMIN_PASSWORD_HASH) return false;
+  const hash = await hashPassword(password);
+  return hash === ADMIN_PASSWORD_HASH;
+}
+
+export function isPasswordConfigured(): boolean {
+  return ADMIN_PASSWORD_HASH.length > 0;
+}
+
+// ── User Storage ────────────────────────────────────────────────
+
 export function loadUser(): GrmeUser | null {
   if (typeof window === "undefined") return null;
   try {
@@ -61,6 +85,8 @@ export function clearUser(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEY);
 }
+
+// ── Hook ────────────────────────────────────────────────────────
 
 export function useGrmeUser() {
   const [user, setUser] = useState<GrmeUser | null>(null);

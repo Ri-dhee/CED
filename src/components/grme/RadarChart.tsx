@@ -13,6 +13,8 @@ export default function RadarChart({
   getDomainScore,
   size = 400,
 }: RadarChartProps) {
+  if (domains.length === 0) return null;
+
   const center = size / 2;
   const radius = (size / 2) * 0.65;
   const levels = 4;
@@ -56,8 +58,11 @@ export default function RadarChart({
       <svg
         viewBox={`0 0 ${size} ${size}`}
         className="w-full h-full"
+        role="img"
         aria-label="Radar chart showing domain scores"
       >
+        <title>GRME Domain Scores</title>
+        <desc>Radar chart displaying scores across {domains.length} domains</desc>
         {gridLevels.map((points, i) => (
           <polygon
             key={i}
@@ -105,7 +110,9 @@ export default function RadarChart({
                 fill={color}
                 stroke="white"
                 strokeWidth="2.5"
-              />
+              >
+                <title>{domain.name}: {Math.round(score)}</title>
+              </circle>
             </g>
           );
         })}

@@ -725,7 +725,15 @@ export default function SpreadsheetEditor({
                                 <td className="px-3 py-1">
                                   <EditableCell
                                     value={ind.direction}
-                                    onSave={() => {}}
+                                    onSave={(v) =>
+                                      onUpdateIndicator(
+                                        domain.id,
+                                        sub.id,
+                                        ind.id,
+                                        "direction",
+                                        v
+                                      )
+                                    }
                                     type="select"
                                     options={DIRECTIONS}
                                   />

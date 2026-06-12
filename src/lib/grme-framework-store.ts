@@ -10,6 +10,7 @@ import {
   FrameworkProposal,
   loadFramework,
   saveFramework,
+  loadFrameworkFromApi,
   createProposal,
   applyProposal,
   generateEntityId,
@@ -17,6 +18,7 @@ import {
   newSubDomain,
   newIndicator,
 } from "./grme-framework";
+import { supabase } from "./supabase";
 
 const CURRENT_USER = "Stakeholder";
 
@@ -25,12 +27,64 @@ export function useGRMEFramework() {
   const [proposals, setProposals] = useState<FrameworkProposal[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const fw = loadFramework();
-    setDomains(fw.domains);
-    setProposals(fw.proposals);
-    setLoaded(true);
+  const refreshFramework = useCallback(async () => {
+    try {
+      const apiFw = await loadFrameworkFromApi();
+      if (apiFw) {
+        setDomains(apiFw.domains);
+        setProposals(apiFw.proposals);
+        saveFramework(apiFw);
+      }
+    } catch {
+      // Keep current state
+    }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function init() {
+      const apiFw = await loadFrameworkFromApi();
+      if (!cancelled && apiFw) {
+        setDomains(apiFw.domains);
+        setProposals(apiFw.proposals);
+        saveFramework(apiFw);
+      } else if (!cancelled) {
+        const fw = loadFramework();
+        setDomains(fw.domains);
+        setProposals(fw.proposals);
+      }
+      if (!cancelled) setLoaded(true);
+    }
+
+    init();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Real-time subscription — auto-refresh when framework changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("framework-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "framework" },
+        () => {
+          refreshFramework();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refreshFramework]);
+
+  // Refresh on window focus
+  useEffect(() => {
+    const handleFocus = () => refreshFramework();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refreshFramework]);
 
   const persist = useCallback(
     (newDomains: Domain[], newProposals: FrameworkProposal[]) => {

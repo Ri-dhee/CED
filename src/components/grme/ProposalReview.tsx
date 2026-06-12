@@ -51,8 +51,8 @@ function getActionIcon(action: string): string {
 }
 
 function getEntityName(p: FrameworkProposal): string {
-  const d = p.data as any;
-  return d.name || d.id || "Unknown";
+  const d = p.data as unknown as Record<string, unknown>;
+  return (d.name as string) || (d.id as string) || "Unknown";
 }
 
 function getChangeSummary(p: FrameworkProposal): string {
@@ -61,8 +61,8 @@ function getChangeSummary(p: FrameworkProposal): string {
 
   // For edits, show what changed
   if (!p.originalData) return "Modified";
-  const orig = p.originalData as any;
-  const curr = p.data as any;
+  const orig = p.originalData as unknown as Record<string, unknown>;
+  const curr = p.data as unknown as Record<string, unknown>;
   const changes: string[] = [];
 
   if (orig.name !== curr.name)

@@ -29,6 +29,9 @@ export default function UserBadge({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="User menu"
         className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors bg-white text-sm"
       >
         <div

@@ -7,6 +7,7 @@ import {
   Direction,
   Benchmark,
 } from "./grme-data";
+import * as api from "./grme-api";
 
 // ── Proposal Types ──────────────────────────────────────────────
 
@@ -76,10 +77,10 @@ export function loadFramework(): FrameworkStorage {
 
 export function saveFramework(fw: FrameworkStorage): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ ...fw, lastUpdated: new Date().toISOString() })
-  );
+  const saved = { ...fw, lastUpdated: new Date().toISOString() };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  // Sync to API (fire-and-forget)
+  api.saveFramework(saved).catch(() => {});
 }
 
 // ── Default Framework ───────────────────────────────────────────
@@ -94,8 +95,8 @@ export function getDefaultFramework(): Domain[] {
 let _cachedDefaults: Domain[] | null = null;
 function getDefaultDomains(): Domain[] {
   if (_cachedDefaults) return _cachedDefaults;
-  // We'll use dynamic import in browser, but since this is a build-time constant
-  // we can just import it at module level (grme-data has no framework deps)
+  // Use dynamic import for browser compatibility
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { DEFAULT_DOMAINS } = require("./grme-data") as {
     DEFAULT_DOMAINS: Domain[];
   };
@@ -392,3 +393,17 @@ export const AVAILABLE_COLORS = [
   "#14b8a6",
   "#f97316",
 ] as const;
+
+// ── Async API Load ────────────────────────────────────────────────
+
+export async function loadFrameworkFromApi(): Promise<FrameworkStorage | null> {
+  try {
+    const data = await api.loadFramework();
+    if (data && data.domains && data.domains.length > 0) {
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

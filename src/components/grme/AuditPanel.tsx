@@ -89,11 +89,12 @@ export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelP
         <span className="text-sm text-gray-400">{allEntries.length} entries</span>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4" role="group" aria-label="Filter audit entries">
         {(["all", "create", "update", "review"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
               filter === f
                 ? "bg-primary text-white"
@@ -110,6 +111,7 @@ export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelP
           <select
             value={noteIndicator}
             onChange={(e) => setNoteIndicator(e.target.value)}
+            aria-label="Select indicator to review"
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Select indicator to review...</option>

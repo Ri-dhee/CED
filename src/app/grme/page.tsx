@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   CITIES,
   getStatusFromScore,
@@ -10,12 +10,21 @@ import {
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
 import { useGrmeUser, canEditFramework, canEnterData } from "@/lib/grme-user";
-import RadarChart from "@/components/RadarChart";
-import DataEntryForm from "@/components/DataEntryForm";
-import AuditPanel from "@/components/AuditPanel";
-import FrameworkEditor from "@/components/FrameworkEditor";
-import LoginScreen from "@/components/LoginScreen";
-import UserBadge from "@/components/UserBadge";
+import {
+  exportYearCsv,
+  exportAllYearsCsv,
+  exportSummaryCsv,
+} from "@/lib/grme-export";
+import RadarChart from "@/components/grme/RadarChart";
+import DataEntryForm from "@/components/grme/DataEntryForm";
+import AuditPanel from "@/components/grme/AuditPanel";
+import FrameworkEditor from "@/components/grme/FrameworkEditor";
+import LoginScreen from "@/components/grme/LoginScreen";
+import UserBadge from "@/components/grme/UserBadge";
+import YearSelector from "@/components/grme/YearSelector";
+import TrendChart from "@/components/grme/TrendChart";
+import UserManagement from "@/components/grme/UserManagement";
+import ApiStatus, { SyncProvider, useSync } from "@/components/grme/ApiStatus";
 
 type Tab = "dashboard" | "entry" | "framework" | "audit";
 
@@ -36,7 +45,11 @@ export default function GRMEPage() {
     );
   }
 
-  return <GRMEApp user={user} onSwitchRole={switchRole} onLogout={logout} />;
+  return (
+    <SyncProvider>
+      <GRMEApp user={user} onSwitchRole={switchRole} onLogout={logout} />
+    </SyncProvider>
+  );
 }
 
 function GRMEApp({
@@ -49,17 +62,28 @@ function GRMEApp({
   onLogout: () => void;
 }) {
   const framework = useGRMEFramework();
+  const { trackSync } = useSync();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
   const {
     cityData,
+    assessment,
     selectedCity,
     setSelectedCity,
+    availableYears,
+    createYear,
+    deleteYear,
     updateIndicator,
     addAuditNote,
     getDomainScore,
     getOverallScore,
     getDataEntryStats,
-  } = useGRMEData(framework.domains, user.name);
+    getScoreForYear,
+    getDomainScoreForYear,
+    apiAvailable,
+    refreshData,
+  } = useGRMEData(framework.domains, user.name, selectedYear);
 
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [selectedDomain, setSelectedDomain] = useState<string>(
@@ -67,6 +91,57 @@ function GRMEApp({
   );
   const [selectedSubdomain, setSelectedSubdomain] = useState<string>(
     framework.domains[0]?.subdomains[0]?.id || ""
+  );
+  const [showUserManagement, setShowUserManagement] = useState(false);
+
+  // Sync-wrapped mutations — every save shows status
+  const trackedUpdateIndicator = useCallback(
+    (indicatorId: string, value: number | string, notes?: string) => {
+      const syncId = `indicator-${selectedCity}-${selectedYear}-${indicatorId}`;
+      const { onSuccess, onError } = trackSync(syncId);
+      updateIndicator(indicatorId, value, notes);
+      // The API call is fire-and-forget inside the store, so we mark success after a brief delay
+      if (apiAvailable) {
+        setTimeout(onSuccess, 500);
+      }
+    },
+    [updateIndicator, trackSync, selectedCity, selectedYear, apiAvailable]
+  );
+
+  const trackedAddAuditNote = useCallback(
+    (indicatorId: string, note: string) => {
+      const syncId = `audit-${selectedCity}-${selectedYear}-${indicatorId}`;
+      const { onSuccess } = trackSync(syncId);
+      addAuditNote(indicatorId, note);
+      if (apiAvailable) {
+        setTimeout(onSuccess, 500);
+      }
+    },
+    [addAuditNote, trackSync, selectedCity, selectedYear, apiAvailable]
+  );
+
+  const trackedCreateYear = useCallback(
+    (year: number, copyFrom?: number) => {
+      const syncId = `create-year-${selectedCity}-${year}`;
+      const { onSuccess } = trackSync(syncId);
+      createYear(year, copyFrom);
+      if (apiAvailable) {
+        setTimeout(onSuccess, 500);
+      }
+    },
+    [createYear, trackSync, selectedCity, apiAvailable]
+  );
+
+  const trackedDeleteYear = useCallback(
+    (year: number) => {
+      const syncId = `delete-year-${selectedCity}-${year}`;
+      const { onSuccess } = trackSync(syncId);
+      deleteYear(year);
+      if (apiAvailable) {
+        setTimeout(onSuccess, 500);
+      }
+    },
+    [deleteYear, trackSync, selectedCity, apiAvailable]
   );
 
   const currentDomain =
@@ -84,8 +159,8 @@ function GRMEApp({
     return result;
   }, [framework.domains, getDomainScore]);
 
-  const overallScore = getOverallScore();
-  const stats = getDataEntryStats();
+  const overallScore = useMemo(() => getOverallScore(), [getOverallScore]);
+  const stats = useMemo(() => getDataEntryStats(), [getDataEntryStats]);
   const overallStatus = getStatusFromScore(overallScore);
   const overallColor = getStatusColor(overallStatus);
 
@@ -113,7 +188,7 @@ function GRMEApp({
         </div>
       </section>
 
-      {/* City Selector + Stats Bar + User Badge */}
+      {/* City + Year Selector + Stats Bar + User Badge */}
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row items-center gap-4">
@@ -133,6 +208,27 @@ function GRMEApp({
                 ))}
               </select>
             </div>
+            <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+            <YearSelector
+              selectedYear={selectedYear}
+              availableYears={availableYears}
+              onYearChange={setSelectedYear}
+              onCreateYear={trackedCreateYear}
+              onDeleteYear={trackedDeleteYear}
+            />
+            <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+            <ExportButton
+              onExportCurrent={() =>
+                exportYearCsv(framework.domains, cityData, selectedYear)
+              }
+              onExportAll={() =>
+                exportAllYearsCsv(framework.domains, cityData, availableYears)
+              }
+              onExportSummary={() =>
+                exportSummaryCsv(framework.domains, cityData, availableYears)
+              }
+              hasData={assessment && Object.keys(assessment.indicators).length > 0}
+            />
             <div className="flex-1" />
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-6 text-sm">
@@ -159,11 +255,27 @@ function GRMEApp({
                   </span>
                 </div>
               </div>
-              <UserBadge
-                user={user}
-                onSwitchRole={onSwitchRole}
-                onLogout={onLogout}
-              />
+              <div className="flex items-center gap-2">
+                <ApiStatus apiAvailable={apiAvailable} onRefresh={refreshData} />
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowUserManagement(true)}
+                    className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+                    aria-label="User management"
+                    title="Manage users"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                )}
+                <UserBadge
+                  user={user}
+                  onSwitchRole={onSwitchRole}
+                  onLogout={onLogout}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -172,7 +284,7 @@ function GRMEApp({
       {/* Tab Navigation */}
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap" role="tablist" aria-label="GRME sections">
             {([
               {
                 id: "dashboard",
@@ -203,6 +315,10 @@ function GRMEApp({
               .map((tab) => (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`panel-${tab.id}`}
+                  id={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     activeTab === tab.id
@@ -238,7 +354,7 @@ function GRMEApp({
 
       {/* Dashboard Tab */}
       {activeTab === "dashboard" && (
-        <section className="pb-12">
+        <section className="pb-12" role="tabpanel" id="panel-dashboard" aria-labelledby="tab-dashboard">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -266,7 +382,7 @@ function GRMEApp({
                     const filled = domain.subdomains
                       .flatMap((s) => s.indicators)
                       .filter(
-                        (i) => cityData.indicators[i.id]?.value !== undefined
+                        (i) => assessment.indicators[i.id]?.value !== undefined
                       ).length;
                     const total = domain.subdomains.flatMap(
                       (s) => s.indicators
@@ -368,13 +484,42 @@ function GRMEApp({
                 <div className="text-xs text-gray-500">Completion</div>
               </div>
             </div>
+
+            {/* Year-over-year trend (show when 2+ years exist) */}
+              {availableYears.length >= 2 && (
+              <div className="mt-6">
+                <TrendChart
+                  years={availableYears}
+                  overallScores={Object.fromEntries(
+                    availableYears.map((y) => [y, getScoreForYear(y)])
+                  )}
+                  domainScores={Object.fromEntries(
+                    availableYears.map((y) => [
+                      y,
+                      Object.fromEntries(
+                        framework.domains.map((d) => [
+                          d.id,
+                          getDomainScoreForYear(d.id, y),
+                        ])
+                      ),
+                    ])
+                  )}
+                  domainLabels={Object.fromEntries(
+                    framework.domains.map((d) => [d.id, d.name])
+                  )}
+                  domainColors={Object.fromEntries(
+                    framework.domains.map((d) => [d.id, d.color])
+                  )}
+                />
+              </div>
+            )}
           </div>
         </section>
       )}
 
       {/* Data Entry Tab */}
       {activeTab === "entry" && canEdit && (
-        <section className="pb-12">
+        <section className="pb-12" role="tabpanel" id="panel-entry" aria-labelledby="tab-entry">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
@@ -392,7 +537,7 @@ function GRMEApp({
                           .flatMap((s) => s.indicators)
                           .filter(
                             (i) =>
-                              cityData.indicators[i.id]?.value !== undefined
+                              assessment.indicators[i.id]?.value !== undefined
                           ).length;
                         const total = domain.subdomains.flatMap(
                           (s) => s.indicators
@@ -454,7 +599,7 @@ function GRMEApp({
                           const subIndicators = sub.indicators;
                           const filledCount = subIndicators.filter(
                             (i) =>
-                              cityData.indicators[i.id]?.value !== undefined
+                              assessment.indicators[i.id]?.value !== undefined
                           ).length;
 
                           return (
@@ -508,11 +653,11 @@ function GRMEApp({
                       key={indicator.id}
                       indicator={indicator}
                       value={
-                        cityData.indicators[indicator.id]?.value ?? null
+                        assessment.indicators[indicator.id]?.value ?? null
                       }
-                      notes={cityData.indicators[indicator.id]?.notes}
+                      notes={assessment.indicators[indicator.id]?.notes}
                       onValueChange={(value, notes) =>
-                        updateIndicator(indicator.id, value, notes)
+                        trackedUpdateIndicator(indicator.id, value, notes)
                       }
                     />
                   ))}
@@ -525,7 +670,7 @@ function GRMEApp({
 
       {/* Framework Tab (Admin only) */}
       {activeTab === "framework" && isAdmin && (
-        <section className="pb-12">
+        <section className="pb-12" role="tabpanel" id="panel-framework" aria-labelledby="tab-framework">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <FrameworkEditor
               domains={framework.domains}
@@ -549,15 +694,121 @@ function GRMEApp({
 
       {/* Audit Tab */}
       {activeTab === "audit" && (
-        <section className="pb-12">
+        <section className="pb-12" role="tabpanel" id="panel-audit" aria-labelledby="tab-audit">
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
             <AuditPanel
               domains={framework.domains}
-              auditLog={cityData.auditLog}
-              onAddNote={addAuditNote}
+              auditLog={assessment.auditLog}
+              onAddNote={trackedAddAuditNote}
             />
           </div>
         </section>
+      )}
+
+      {/* User Management Modal */}
+      {showUserManagement && isAdmin && (
+        <UserManagement onClose={() => setShowUserManagement(false)} />
+      )}
+    </div>
+  );
+}
+
+// ── Export Button ────────────────────────────────────────────────
+
+function ExportButton({
+  onExportCurrent,
+  onExportAll,
+  onExportSummary,
+  hasData,
+}: {
+  onExportCurrent: () => void;
+  onExportAll: () => void;
+  onExportSummary: () => void;
+  hasData: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="Export data"
+        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Export
+        <svg
+          className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-gray-100">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                Download CSV
+              </div>
+            </div>
+            <div className="py-1">
+              <button
+                onClick={() => {
+                  onExportCurrent();
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div>
+                  <div className="font-medium">Current Year</div>
+                  <div className="text-[10px] text-gray-400">All indicators for selected year</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  onExportAll();
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                </svg>
+                <div>
+                  <div className="font-medium">All Years</div>
+                  <div className="text-[10px] text-gray-400">Comparison across years</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  onExportSummary();
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <div>
+                  <div className="font-medium">Summary</div>
+                  <div className="text-[10px] text-gray-400">Domain scores overview</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

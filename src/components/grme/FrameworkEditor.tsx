@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { Domain, SubDomain, Indicator } from "@/lib/grme-data";
+import { FrameworkProposal } from "@/lib/grme-framework";
 import SpreadsheetEditor from "./SpreadsheetEditor";
 import ProposalReview from "./ProposalReview";
 
 interface FrameworkEditorProps {
   domains: Domain[];
-  pendingProposals: any[];
-  reviewedProposals: any[];
+  pendingProposals: FrameworkProposal[];
+  reviewedProposals: FrameworkProposal[];
   // Spreadsheet update handlers
   onUpdateDomain: (domainId: string, field: string, value: string) => void;
   onUpdateSubDomain: (

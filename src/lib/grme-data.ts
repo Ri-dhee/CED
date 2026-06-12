@@ -70,9 +70,15 @@ export interface AuditLog {
 export interface CityData {
   cityId: string;
   cityName: string;
+  assessments: Record<number, AssessmentYear>;
+}
+
+export interface AssessmentYear {
   year: number;
   indicators: Record<string, IndicatorData>;
   auditLog: AuditLog[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -94,6 +100,16 @@ export function calculateIndicatorScore(value: number, indicator: Indicator): nu
   const developing = parseFloat(b.developing);
   const progressive = parseFloat(b.progressive);
   const exemplary = parseFloat(b.exemplary);
+
+  // Guard against NaN from bad benchmark data
+  if (isNaN(critical) || isNaN(developing) || isNaN(progressive) || isNaN(exemplary)) {
+    return 50;
+  }
+
+  // Guard against division by zero (identical benchmarks)
+  if (critical === developing || developing === progressive || progressive === exemplary) {
+    return 50;
+  }
 
   if (indicator.direction === "higher") {
     // Higher value = better score
