@@ -331,6 +331,7 @@ export function cloneIndicator(i: Indicator): Indicator {
 export function newDomain(): Domain {
   return {
     id: generateEntityId("domain"),
+    aliases: [],
     name: "",
     shortName: "",
     description: "",
@@ -344,6 +345,7 @@ export function newDomain(): Domain {
 export function newSubDomain(): SubDomain {
   return {
     id: generateEntityId("subdomain"),
+    aliases: [],
     name: "",
     indicators: [],
   };
@@ -352,6 +354,7 @@ export function newSubDomain(): SubDomain {
 export function newIndicator(): Indicator {
   return {
     id: generateEntityId("indicator"),
+    aliases: [],
     name: "",
     type: "Quantitative" as IndicatorType,
     dataType: "percentage" as DataType,

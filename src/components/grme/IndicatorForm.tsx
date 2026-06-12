@@ -56,7 +56,13 @@ export default function IndicatorForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) onSave(data);
+    if (validate()) {
+      const payload =
+        data.id !== indicator.id
+          ? { ...data, aliases: Array.from(new Set([...(indicator.aliases || []), indicator.id])) }
+          : data;
+      onSave(payload);
+    }
   };
 
   return (

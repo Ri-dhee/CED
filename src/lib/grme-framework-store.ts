@@ -248,9 +248,15 @@ export function useGRMEFramework() {
       const newDomains = domains.map((d) => {
         if (d.id !== domainId) return d;
         const updated = { ...d };
+        const oldId = d.id;
         if (field === "name") updated.name = value;
         else if (field === "shortName") updated.shortName = value;
-        else if (field === "id") updated.id = value;
+        else if (field === "id") {
+          if (value && value !== d.id) {
+            updated.aliases = Array.from(new Set([...(d.aliases || []), oldId]));
+            updated.id = value;
+          }
+        }
         else if (field === "description") updated.description = value;
         else if (field === "methodologyNote") updated.methodologyNote = value;
         else if (field === "color") updated.color = value;
@@ -275,8 +281,18 @@ export function useGRMEFramework() {
           ...d,
           subdomains: d.subdomains.map((s) => {
             if (s.id !== subId) return s;
+            const oldId = s.id;
             if (field === "name") return { ...s, name: value };
-            if (field === "id") return { ...s, id: value };
+            if (field === "id") {
+              if (value && value !== s.id) {
+                return {
+                  ...s,
+                  id: value,
+                  aliases: Array.from(new Set([...(s.aliases || []), oldId])),
+                };
+              }
+              return s;
+            }
             if (field === "description") return { ...s, description: value };
             if (field === "weight")
               return {
@@ -315,8 +331,18 @@ export function useGRMEFramework() {
               ...s,
               indicators: s.indicators.map((ind) => {
                 if (ind.id !== indId) return ind;
+                const oldId = ind.id;
                 if (field === "name") return { ...ind, name: value };
-                if (field === "id") return { ...ind, id: value };
+                if (field === "id") {
+                  if (value && value !== ind.id) {
+                    return {
+                      ...ind,
+                      id: value,
+                      aliases: Array.from(new Set([...(ind.aliases || []), oldId])),
+                    };
+                  }
+                  return ind;
+                }
                 if (field === "type")
                   return { ...ind, type: value as Indicator["type"] };
                 if (field === "dataType")

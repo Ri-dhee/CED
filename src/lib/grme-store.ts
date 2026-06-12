@@ -10,6 +10,8 @@ import {
   AuditLog,
   calculateIndicatorScore,
   calculateDomainScore,
+  reconcileDataWithDomains,
+  resolveIndicatorData,
   getIndicatorConfidenceWeight,
   adjustScoreForConfidence,
   calculateWeightedOverallScore,
@@ -92,7 +94,9 @@ function findIndicatorInDomains(
 ) {
   for (const domain of domains) {
     for (const sub of domain.subdomains) {
-      const ind = sub.indicators.find((i) => i.id === indicatorId);
+      const ind = sub.indicators.find(
+        (i) => i.id === indicatorId || (i.aliases || []).includes(indicatorId)
+      );
       if (ind) return ind;
     }
   }
@@ -139,8 +143,9 @@ export function useGRMEData(
   const refreshData = useCallback(async () => {
     try {
       const apiData = await api.loadAssessments();
-      setAllData(apiData);
-      saveAllData(apiData);
+      const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
+      setAllData(reconciled);
+      saveAllData(reconciled);
       setApiAvailable(true);
     } catch {
       setApiAvailable(false);
@@ -155,8 +160,9 @@ export function useGRMEData(
       try {
         const apiData = await api.loadAssessments();
         if (!cancelled) {
-          setAllData(apiData);
-          saveAllData(apiData);
+          const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
+          setAllData(reconciled);
+          saveAllData(reconciled);
           setApiAvailable(true);
         }
       } catch {
@@ -170,6 +176,14 @@ export function useGRMEData(
     init();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    setAllData((prev) => {
+      const reconciled = reconcileDataWithDomains(prev, domainsRef.current);
+      saveAllData(reconciled);
+      return reconciled;
+    });
+  }, [domains]);
 
   // Real-time subscription — auto-refresh when data changes in Supabase
   useEffect(() => {
@@ -438,19 +452,13 @@ export function useGRMEData(
 
   const getIndicatorScore = useCallback(
     (indicatorId: string): number | null => {
-      const data = assessment.indicators[indicatorId];
-      if (
-        data === undefined ||
-        data.value === null ||
-        data.value === undefined
-      ) {
-        return null;
-      }
       const indicator = findIndicatorInDomains(
         domainsRef.current,
         indicatorId
       );
       if (!indicator) return null;
+      const data = resolveIndicatorData(assessment, indicator);
+      if (!data || data.value === null || data.value === undefined) return null;
       if (typeof data.value === "string") return null;
       return calculateIndicatorScore(data.value as number | boolean, indicator);
     },
@@ -484,15 +492,28 @@ export function useGRMEData(
           for (const indicator of sub.indicators) {
             const weight = getIndicatorConfidenceWeight(indicator) * (sub.weight ?? 1);
             totalWeight += weight;
-            const data = assess.indicators[indicator.id];
-            if (data !== undefined && data.value !== null && data.value !== undefined) {
+            const data = resolveIndicatorData(assess, indicator);
+            if (data && data.value !== null && data.value !== undefined) {
               filledWeight += weight;
             }
           }
         }
       }
 
-      const filled = Object.keys(assess.indicators).length;
+      const filled = domainsRef.current.reduce((count, domain) => {
+        return (
+          count +
+          domain.subdomains.reduce((subCount, sub) => {
+            return (
+              subCount +
+              sub.indicators.filter((indicator) => {
+                const data = resolveIndicatorData(assess, indicator);
+                return data !== null && data.value !== null && data.value !== undefined;
+              }).length
+            );
+          }, 0)
+        );
+      }, 0);
       const confidence = totalWeight > 0 ? Math.round((filledWeight / totalWeight) * 100) : 0;
       const missing = Math.max(total - filled, 0);
 
@@ -516,8 +537,8 @@ export function useGRMEData(
         for (const indicator of sub.indicators) {
           const weight = getIndicatorConfidenceWeight(indicator) * (sub.weight ?? 1);
           totalWeight += weight;
-          const data = assess.indicators[indicator.id];
-          if (data !== undefined && data.value !== null && data.value !== undefined) {
+          const data = resolveIndicatorData(assess, indicator);
+          if (data && data.value !== null && data.value !== undefined) {
             filledWeight += weight;
           }
         }
@@ -595,14 +616,13 @@ export function useGRMEData(
       if (!assess) return 0;
 
       const getScoreForIndicator = (indicatorId: string): number | null => {
-        const data = assess.indicators[indicatorId];
-        if (data === undefined || data.value === null || data.value === undefined)
-          return null;
         const indicator = findIndicatorInDomains(
           domainsRef.current,
           indicatorId
         );
         if (!indicator) return null;
+        const data = resolveIndicatorData(assess, indicator);
+        if (!data || data.value === null || data.value === undefined) return null;
         if (typeof data.value === "string") return null;
         return calculateIndicatorScore(data.value as number | boolean, indicator);
       };
@@ -628,14 +648,13 @@ export function useGRMEData(
       if (!domain) return 50;
 
       const getScoreForIndicator = (indicatorId: string): number | null => {
-        const data = assess.indicators[indicatorId];
-        if (data === undefined || data.value === null || data.value === undefined)
-          return null;
         const indicator = findIndicatorInDomains(
           domainsRef.current,
           indicatorId
         );
         if (!indicator) return null;
+        const data = resolveIndicatorData(assess, indicator);
+        if (!data || data.value === null || data.value === undefined) return null;
         if (typeof data.value === "string") return null;
         return calculateIndicatorScore(data.value as number | boolean, indicator);
       };

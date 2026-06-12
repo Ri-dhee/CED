@@ -23,6 +23,7 @@ export interface Benchmark {
 
 export interface Indicator {
   id: string;
+  aliases?: string[];
   name: string;
   type: IndicatorType;
   dataType: DataType;
@@ -37,6 +38,7 @@ export interface Indicator {
 
 export interface SubDomain {
   id: string;
+  aliases?: string[];
   name: string;
   description?: string;
   indicators: Indicator[];
@@ -45,6 +47,7 @@ export interface SubDomain {
 
 export interface Domain {
   id: string;
+  aliases?: string[];
   name: string;
   shortName: string;
   description: string;
@@ -187,6 +190,60 @@ export function getStatusBg(status: ScoreStatus): string {
     case "Progressive": return "#eff6ff";
     case "Exemplary": return "#ecfdf5";
   }
+}
+
+export function resolveIndicatorData(
+  assessment: AssessmentYear | undefined,
+  indicator: Indicator
+): IndicatorData | null {
+  if (!assessment) return null;
+  const direct = assessment.indicators[indicator.id];
+  if (direct) return direct;
+  for (const alias of indicator.aliases || []) {
+    const match = assessment.indicators[alias];
+    if (match) return match;
+  }
+  return null;
+}
+
+export function reconcileDataWithDomains(
+  allData: Record<string, CityData>,
+  domains: Domain[]
+): Record<string, CityData> {
+  const reconciled: Record<string, CityData> = {};
+
+  for (const [cityId, city] of Object.entries(allData)) {
+    const nextAssessments: Record<number, AssessmentYear> = {};
+
+    for (const [yearKey, assess] of Object.entries(city.assessments)) {
+      const nextIndicators: Record<string, IndicatorData> = {};
+
+      for (const domain of domains) {
+        for (const sub of domain.subdomains) {
+          for (const indicator of sub.indicators) {
+            const data = resolveIndicatorData(assess, indicator);
+            if (!data) continue;
+            nextIndicators[indicator.id] = {
+              ...data,
+              indicatorId: indicator.id,
+            };
+          }
+        }
+      }
+
+      nextAssessments[Number(yearKey)] = {
+        ...assess,
+        indicators: nextIndicators,
+      };
+    }
+
+    reconciled[cityId] = {
+      ...city,
+      assessments: nextAssessments,
+    };
+  }
+
+  return reconciled;
 }
 
 /**

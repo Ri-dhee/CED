@@ -25,7 +25,13 @@ export default function DomainForm({ domain, onSave, onCancel }: DomainFormProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) onSave(data);
+    if (validate()) {
+      const payload =
+        data.id !== domain.id
+          ? { ...data, aliases: Array.from(new Set([...(domain.aliases || []), domain.id])) }
+          : data;
+      onSave(payload);
+    }
   };
 
   return (

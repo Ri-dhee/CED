@@ -27,7 +27,13 @@ export default function SubDomainForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) onSave(data);
+    if (validate()) {
+      const payload =
+        data.id !== subDomain.id
+          ? { ...data, aliases: Array.from(new Set([...(subDomain.aliases || []), subDomain.id])) }
+          : data;
+      onSave(payload);
+    }
   };
 
   return (
