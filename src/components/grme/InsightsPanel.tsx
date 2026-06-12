@@ -37,6 +37,9 @@ export default function InsightsPanel({
     const sorted = [...domainScores].sort((a, b) => b.score - a.score);
     const strongest = sorted[0];
     const weakest = sorted[sorted.length - 1];
+    const highest = sorted[0]?.score ?? 0;
+    const lowest = sorted[sorted.length - 1]?.score ?? 0;
+    const spread = Math.round(highest - lowest);
 
     const result: Insight[] = [];
 
@@ -107,6 +110,24 @@ export default function InsightsPanel({
           bg: "#fef2f2",
         });
       }
+    }
+
+    // Balance check
+    if (sorted.length > 0) {
+      const balanceStatus =
+        spread >= 40 ? "Critical" : spread >= 25 ? "Developing" : "Progressive";
+      result.push({
+        icon: "⚖️",
+        label: "Balance Check",
+        value:
+          spread >= 40
+            ? `Highly uneven (${spread} pt spread)`
+            : spread >= 25
+              ? `Moderately uneven (${spread} pt spread)`
+              : `Balanced (${spread} pt spread)`,
+        color: getStatusColor(balanceStatus),
+        bg: getStatusBg(balanceStatus),
+      });
     }
 
     // Status distribution

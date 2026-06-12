@@ -10,6 +10,7 @@ import {
   AuditLog,
   calculateIndicatorScore,
   calculateDomainScore,
+  geometricMean,
 } from "./grme-data";
 import * as api from "./grme-api";
 import { supabase } from "./supabase";
@@ -469,13 +470,15 @@ export function useGRMEData(
 
   const getOverallScore = useCallback((): number => {
     const scores = domainsRef.current.map((d) => getDomainScore(d.id));
-    return scores.reduce((a, b) => a + b, 0) / scores.length;
+    return geometricMean(scores);
   }, [getDomainScore]);
 
   const getDataEntryStats = useCallback((): {
     total: number;
     filled: number;
+    missing: number;
     percentage: number;
+    confidence: number;
   } => {
     const total = domainsRef.current.reduce(
       (sum, d) =>
@@ -484,11 +487,14 @@ export function useGRMEData(
       0
     );
     const filled = Object.keys(assessment.indicators).length;
+    const missing = Math.max(total - filled, 0);
+    const confidence = total > 0 ? Math.round((filled / total) * 100) : 0;
     return {
       total,
       filled,
-      percentage:
-        total > 0 ? Math.round((filled / total) * 100) : 0,
+      missing,
+      percentage: confidence,
+      confidence,
     };
   }, [assessment]);
 
@@ -514,9 +520,7 @@ export function useGRMEData(
       const domainScores = domainsRef.current.map((d) =>
         calculateDomainScore(d, getScoreForIndicator)
       );
-      return (
-        domainScores.reduce((a, b) => a + b, 0) / domainScores.length
-      );
+      return geometricMean(domainScores);
     },
     [ensureCity, selectedCity]
   );

@@ -384,6 +384,14 @@ function GRMEApp({
                   showGrade
                   showTrend
                 />
+                <div className="mt-4 text-center">
+                  <div className="text-xs font-medium text-gray-500">
+                    Confidence {stats.confidence}%
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Based on {stats.filled}/{stats.total} indicators
+                  </div>
+                </div>
               </div>
 
               {/* Radar Chart — core visual */}

@@ -6,7 +6,13 @@ import { Domain, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
 interface DataQualityBarProps {
   domains: Domain[];
   getDomainScore: (domainId: string) => number;
-  getDataEntryStats: () => { filled: number; total: number; percentage: number };
+  getDataEntryStats: () => {
+    filled: number;
+    total: number;
+    missing: number;
+    percentage: number;
+    confidence: number;
+  };
 }
 
 export default function DataQualityBar({
@@ -82,7 +88,7 @@ export default function DataQualityBar({
         })}
       </div>
 
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-2 gap-2">
         <span className="text-[11px] text-gray-500">
           {stats.percentage >= 75
             ? "Excellent coverage"
@@ -92,11 +98,14 @@ export default function DataQualityBar({
                 ? "Partial data — gaps remain"
                 : "Limited data — enter indicators"}
         </span>
-        <span className="text-[11px] font-bold" style={{
+        <span className="text-[11px] font-bold tabular-nums" style={{
           color: stats.percentage >= 75 ? "#059669" : stats.percentage >= 50 ? "#d97706" : stats.percentage >= 25 ? "#ea580c" : "#dc2626"
         }}>
-          {stats.percentage}%
+          Confidence {stats.confidence}%
         </span>
+      </div>
+      <div className="mt-1 text-[10px] text-gray-400">
+        {stats.missing} indicators still missing
       </div>
     </div>
   );
