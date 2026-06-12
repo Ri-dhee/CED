@@ -5,6 +5,7 @@ const experiences = [
     client: "Ministry of Environment",
     description:
       "Leading the development of a comprehensive national environmental strategy, including policy frameworks, implementation roadmaps, and stakeholder engagement programs across multiple sectors.",
+    tags: ["Policy", "Strategy", "Government"],
   },
   {
     year: "2021 - 2023",
@@ -12,6 +13,7 @@ const experiences = [
     client: "City Development Authority",
     description:
       "Designed and oversaw a large-scale urban sustainability initiative focusing on green infrastructure, waste management optimization, and renewable energy integration for metropolitan areas.",
+    tags: ["Urban Planning", "Infrastructure", "Energy"],
   },
   {
     year: "2019 - 2021",
@@ -19,6 +21,7 @@ const experiences = [
     client: "International Conservation Fund",
     description:
       "Managed a multi-stakeholder coastal restoration project, including mangrove reforestation, biodiversity monitoring, and community-based conservation programs spanning 500+ hectares.",
+    tags: ["Conservation", "Biodiversity", "Community"],
   },
   {
     year: "2017 - 2019",
@@ -26,6 +29,7 @@ const experiences = [
     client: "Regional Development Bank",
     description:
       "Developed climate risk assessment models and resilience frameworks for infrastructure investments, helping secure sustainable financing for climate-adaptive projects.",
+    tags: ["Climate", "Finance", "Risk Assessment"],
   },
   {
     year: "2015 - 2017",
@@ -33,6 +37,7 @@ const experiences = [
     client: "NGO Partnership Network",
     description:
       "Implemented participatory development programs in rural communities, focusing on sustainable agriculture, water resource management, and livelihood diversification.",
+    tags: ["Community", "Agriculture", "Water"],
   },
   {
     year: "2012 - 2015",
@@ -40,48 +45,67 @@ const experiences = [
     client: "National Regulatory Agency",
     description:
       "Designed and deployed a digital EIA tracking and management system, streamlining the approval process for development projects while strengthening environmental safeguards.",
+    tags: ["Technology", "Regulatory", "Digital"],
   },
 ];
 
 export default function Experience() {
   return (
     <div>
-      <section className="bg-gradient-to-br from-primary-dark via-primary to-primary-light text-white py-20">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Experience</h1>
-          <p className="text-lg text-white/80 max-w-2xl mx-auto">
-            Over a decade of delivering impactful environmental and development
-            solutions across the globe.
-          </p>
+      <section className="relative pt-40 pb-28 bg-gradient-to-br from-slate-50 via-white to-emerald-50 overflow-hidden">
+        <div className="hero-glow top-0 left-0" />
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="text-center max-w-3xl mx-auto">
+            <span className="text-sm font-semibold text-primary uppercase tracking-widest">Our Track Record</span>
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mt-4 mb-6">
+              Decades of <span className="gradient-text">Proven Impact</span>
+            </h1>
+            <p className="text-lg text-gray-500 leading-relaxed">
+              Over a decade of delivering impactful environmental and development
+              solutions across the globe. Each project reflects our commitment to
+              excellence and sustainability.
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="py-20 bg-white">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="relative">
-            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-accent -translate-x-1/2" />
-            {experiences.map((exp, index) => (
+      <section className="py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid grid-cols-1 gap-8">
+            {experiences.map((exp, i) => (
               <div
-                key={index}
-                className={`relative flex flex-col md:flex-row gap-8 mb-12 ${
-                  index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
-                }`}
+                key={i}
+                className="group relative bg-white rounded-2xl border border-gray-100 p-8 hover:shadow-xl hover:border-primary/20 transition-all hover:-translate-y-0.5"
               >
-                <div className="hidden md:block w-1/2" />
-                <div className="absolute left-4 md:left-1/2 w-4 h-4 bg-primary rounded-full border-4 border-accent -translate-x-1/2 mt-6 z-10" />
-                <div className="w-full md:w-1/2 pl-10 md:pl-0">
-                  <span className="text-sm font-semibold text-primary bg-accent-light px-3 py-1 rounded-full">
-                    {exp.year}
-                  </span>
-                  <h3 className="text-xl font-semibold text-gray-900 mt-3 mb-1">
-                    {exp.title}
-                  </h3>
-                  <p className="text-sm font-medium text-primary mb-2">
-                    {exp.client}
-                  </p>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    {exp.description}
-                  </p>
+                <div className="flex flex-col md:flex-row md:items-start gap-6">
+                  <div className="md:w-48 shrink-0">
+                    <span className="inline-flex px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/20 text-primary font-semibold rounded-lg text-sm">
+                      {exp.year}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <h3 className="text-xl font-bold text-gray-900">
+                        {exp.title}
+                      </h3>
+                    </div>
+                    <p className="text-primary font-medium text-sm mb-3">
+                      {exp.client}
+                    </p>
+                    <p className="text-gray-500 leading-relaxed mb-4">
+                      {exp.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {exp.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-3 py-1 bg-gray-50 text-gray-500 text-xs font-medium rounded-full border border-gray-100"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

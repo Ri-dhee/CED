@@ -63,41 +63,62 @@ const categories = [
   "Research Organization",
 ];
 
+const categoryIcons: Record<string, string> = {
+  "International Organization": "🌐",
+  "NGO": "🤝",
+  "Government": "🏛️",
+  "Financial Institution": "🏦",
+  "Research Organization": "🔬",
+};
+
 export default function Partners() {
   return (
     <div>
-      <section className="bg-gradient-to-br from-primary-dark via-primary to-primary-light text-white py-20">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Partners</h1>
-          <p className="text-lg text-white/80 max-w-2xl mx-auto">
-            We collaborate with leading organizations worldwide to deliver
-            impactful environmental and development solutions.
-          </p>
+      <section className="relative pt-40 pb-28 bg-gradient-to-br from-slate-50 via-white to-emerald-50 overflow-hidden">
+        <div className="hero-glow top-0 right-0" />
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="text-center max-w-3xl mx-auto">
+            <span className="text-sm font-semibold text-primary uppercase tracking-widest">Our Network</span>
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mt-4 mb-6">
+              Trusted by <span className="gradient-text">Global Leaders</span>
+            </h1>
+            <p className="text-lg text-gray-500 leading-relaxed">
+              We collaborate with leading organizations worldwide to deliver
+              impactful environmental and development solutions that create
+              lasting change.
+            </p>
+          </div>
         </div>
       </section>
 
-      {categories.map((category) => {
+      {categories.map((category, ci) => {
         const filtered = partners.filter((p) => p.category === category);
         if (filtered.length === 0) return null;
         return (
-          <section
-            key={category}
-            className="py-16 even:bg-gray-50 odd:bg-white"
-          >
-            <div className="max-w-6xl mx-auto px-4">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8">
-                {category}
-              </h2>
+          <section key={category} className={`py-20 ${ci % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="flex items-center gap-3 mb-10">
+                <span className="text-2xl">{categoryIcons[category]}</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{category}</h2>
+                  <div className="h-0.5 w-12 bg-gradient-to-r from-primary to-primary-light rounded-full mt-2" />
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtered.map((partner, index) => (
                   <div
                     key={index}
-                    className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-accent transition-all"
+                    className="group bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-primary/20 transition-all hover:-translate-y-0.5 card-shine"
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-accent/20 rounded-xl flex items-center justify-center mb-4 group-hover:from-primary group-hover:to-primary-light transition-all">
+                      <span className="text-lg group-hover:scale-110 transition-transform">
+                        {categoryIcons[category]}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">
                       {partner.name}
                     </h3>
-                    <p className="text-gray-600 text-sm leading-relaxed">
+                    <p className="text-gray-500 text-sm leading-relaxed">
                       {partner.description}
                     </p>
                   </div>
