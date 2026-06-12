@@ -222,6 +222,12 @@ export function useGRMEFramework() {
             if (s.id !== subId) return s;
             if (field === "name") return { ...s, name: value };
             if (field === "id") return { ...s, id: value };
+            if (field === "description") return { ...s, description: value };
+            if (field === "weight")
+              return {
+                ...s,
+                weight: value ? parseFloat(value) : undefined,
+              };
             return s;
           }),
         };

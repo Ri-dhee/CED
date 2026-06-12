@@ -475,11 +475,38 @@ export default function SpreadsheetEditor({
                                 }
                               />
                             </td>
-                            <td colSpan={9} className="px-3 py-1.5">
+                            <td colSpan={7} className="px-3 py-1.5">
                               <span className="text-[10px] text-gray-400">
                                 {sub.indicators.length} indicators
                               </span>
                             </td>
+                            <td className="px-3 py-1.5">
+                              <EditableCell
+                                value={String(sub.weight ?? "")}
+                                onSave={(v) =>
+                                  onUpdateSubDomain(
+                                    domain.id,
+                                    sub.id,
+                                    "weight",
+                                    v
+                                  )
+                                }
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <EditableCell
+                                value={sub.description || ""}
+                                onSave={(v) =>
+                                  onUpdateSubDomain(
+                                    domain.id,
+                                    sub.id,
+                                    "description",
+                                    v
+                                  )
+                                }
+                              />
+                            </td>
+                            <td className="px-3 py-1.5"></td>
                             <td className="px-3 py-1.5">
                               <button
                                 onClick={() => onAddIndicator(domain.id, sub.id)}

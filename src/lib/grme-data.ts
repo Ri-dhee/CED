@@ -37,6 +37,7 @@ export interface Indicator {
 export interface SubDomain {
   id: string;
   name: string;
+  description?: string;
   indicators: Indicator[];
   weight?: number;
 }
