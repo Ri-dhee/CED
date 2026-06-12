@@ -126,12 +126,6 @@ export default function Home() {
                   </svg>
                 </Link>
                 <Link
-                  href="/grme"
-                  className="inline-flex items-center px-5 sm:px-8 py-3 sm:py-4 border-2 border-primary/20 text-primary font-semibold rounded-xl hover:bg-primary/5 transition-all text-sm sm:text-base"
-                >
-                  GRME Index
-                </Link>
-                <Link
                   href="/partners"
                   className="inline-flex items-center px-5 sm:px-8 py-3 sm:py-4 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:border-primary hover:text-primary transition-all text-sm sm:text-base"
                 >
