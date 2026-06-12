@@ -87,7 +87,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const hasErrors = entries.some((e) => e.status === "error");
-  const isSaving = entries.some((e) => e.status === "saving");
 
   return (
     <SyncContext.Provider value={{ trackSync, entries, hasErrors, retryAll }}>

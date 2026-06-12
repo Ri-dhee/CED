@@ -98,7 +98,7 @@ function GRMEApp({
   const trackedUpdateIndicator = useCallback(
     (indicatorId: string, value: number | string, notes?: string) => {
       const syncId = `indicator-${selectedCity}-${selectedYear}-${indicatorId}`;
-      const { onSuccess, onError } = trackSync(syncId);
+      const { onSuccess } = trackSync(syncId);
       updateIndicator(indicatorId, value, notes);
       // The API call is fire-and-forget inside the store, so we mark success after a brief delay
       if (apiAvailable) {
@@ -227,7 +227,6 @@ function GRMEApp({
               onExportSummary={() =>
                 exportSummaryCsv(framework.domains, cityData, availableYears)
               }
-              hasData={assessment && Object.keys(assessment.indicators).length > 0}
             />
             <div className="flex-1" />
             <div className="flex items-center gap-4">
@@ -719,12 +718,10 @@ function ExportButton({
   onExportCurrent,
   onExportAll,
   onExportSummary,
-  hasData,
 }: {
   onExportCurrent: () => void;
   onExportAll: () => void;
   onExportSummary: () => void;
-  hasData: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
