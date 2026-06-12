@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { AuditLog, AuditEntry, DOMAINS } from "@/lib/grme-data";
+import { AuditLog, AuditEntry, Domain } from "@/lib/grme-data";
 
 interface AuditPanelProps {
+  domains: Domain[];
   auditLog: AuditLog[];
   onAddNote: (indicatorId: string, note: string) => void;
 }
@@ -19,8 +20,8 @@ function formatDate(iso: string): string {
   });
 }
 
-function getIndicatorName(indicatorId: string): string {
-  for (const domain of DOMAINS) {
+function getIndicatorName(domains: Domain[], indicatorId: string): string {
+  for (const domain of domains) {
     for (const sub of domain.subdomains) {
       const ind = sub.indicators.find((i) => i.id === indicatorId);
       if (ind) return ind.name;
@@ -60,7 +61,7 @@ function getActionColor(action: AuditEntry["action"]) {
   }
 }
 
-export default function AuditPanel({ auditLog, onAddNote }: AuditPanelProps) {
+export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelProps) {
   const [filter, setFilter] = useState<"all" | "create" | "update" | "review">("all");
   const [noteIndicator, setNoteIndicator] = useState<string>("");
   const [noteText, setNoteText] = useState("");
@@ -112,7 +113,7 @@ export default function AuditPanel({ auditLog, onAddNote }: AuditPanelProps) {
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Select indicator to review...</option>
-            {DOMAINS.flatMap((d) =>
+            {domains.flatMap((d) =>
               d.subdomains.flatMap((s) =>
                 s.indicators.map((i) => (
                   <option key={i.id} value={i.id}>
@@ -166,7 +167,7 @@ export default function AuditPanel({ auditLog, onAddNote }: AuditPanelProps) {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 truncate">
-                  {getIndicatorName(entry.indicatorId)}
+                  {getIndicatorName(domains, entry.indicatorId)}
                 </p>
                 {entry.oldValue !== undefined && (
                   <p className="text-xs text-gray-400 mt-1">

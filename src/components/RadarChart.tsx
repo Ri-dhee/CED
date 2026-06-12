@@ -1,17 +1,22 @@
 "use client";
 
-import { DOMAINS, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
+import { Domain, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
 
 interface RadarChartProps {
+  domains: Domain[];
   getDomainScore: (domainId: string) => number;
   size?: number;
 }
 
-export default function RadarChart({ getDomainScore, size = 400 }: RadarChartProps) {
+export default function RadarChart({
+  domains,
+  getDomainScore,
+  size = 400,
+}: RadarChartProps) {
   const center = size / 2;
   const radius = (size / 2) * 0.65;
   const levels = 4;
-  const angleStep = (2 * Math.PI) / DOMAINS.length;
+  const angleStep = (2 * Math.PI) / domains.length;
 
   const getPoint = (index: number, value: number) => {
     const angle = angleStep * index - Math.PI / 2;
@@ -22,21 +27,25 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
     };
   };
 
-  const scores = DOMAINS.map((d) => getDomainScore(d.id));
+  const scores = domains.map((d) => getDomainScore(d.id));
 
   const getPolygonPoints = () => {
-    return scores.map((score, i) => {
-      const point = getPoint(i, score);
-      return `${point.x},${point.y}`;
-    }).join(" ");
+    return scores
+      .map((score, i) => {
+        const point = getPoint(i, score);
+        return `${point.x},${point.y}`;
+      })
+      .join(" ");
   };
 
   const gridLevels = Array.from({ length: levels }, (_, i) => {
     const levelValue = ((i + 1) / levels) * 100;
-    return DOMAINS.map((_, j) => {
-      const point = getPoint(j, levelValue);
-      return `${point.x},${point.y}`;
-    }).join(" ");
+    return domains
+      .map((_, j) => {
+        const point = getPoint(j, levelValue);
+        return `${point.x},${point.y}`;
+      })
+      .join(" ");
   });
 
   const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -60,7 +69,7 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
           />
         ))}
 
-        {DOMAINS.map((_, i) => {
+        {domains.map((_, i) => {
           const point = getPoint(i, 100);
           return (
             <line
@@ -82,7 +91,7 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
           strokeWidth="2.5"
         />
 
-        {DOMAINS.map((domain, i) => {
+        {domains.map((domain, i) => {
           const score = scores[i];
           const point = getPoint(i, score);
           const status = getStatusFromScore(score);
@@ -101,7 +110,7 @@ export default function RadarChart({ getDomainScore, size = 400 }: RadarChartPro
           );
         })}
 
-        {DOMAINS.map((domain, i) => {
+        {domains.map((domain, i) => {
           const point = getPoint(i, 125);
           const score = Math.round(scores[i]);
           const status = getStatusFromScore(score);

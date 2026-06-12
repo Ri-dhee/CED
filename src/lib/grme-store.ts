@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
+  Domain,
   CityData,
   IndicatorData,
   AuditEntry,
   AuditLog,
-  DOMAINS,
   calculateIndicatorScore,
   calculateDomainScore,
-  getStatusFromScore,
 } from "./grme-data";
 
 const STORAGE_KEY = "grme-data";
@@ -34,8 +33,11 @@ function saveAllData(data: Record<string, CityData>): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-function findIndicator(indicatorId: string) {
-  for (const domain of DOMAINS) {
+function findIndicatorInDomains(
+  domains: Domain[],
+  indicatorId: string
+) {
+  for (const domain of domains) {
     for (const sub of domain.subdomains) {
       const ind = sub.indicators.find((i) => i.id === indicatorId);
       if (ind) return ind;
@@ -44,9 +46,11 @@ function findIndicator(indicatorId: string) {
   return null;
 }
 
-export function useGRMEData() {
+export function useGRMEData(domains: Domain[]) {
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
+  const domainsRef = useRef(domains);
+  domainsRef.current = domains;
 
   useEffect(() => {
     setAllData(loadAllData());
@@ -71,7 +75,8 @@ export function useGRMEData() {
         user: CURRENT_USER,
         action: existing ? "update" : "create",
         field: "value",
-        oldValue: existing?.value !== undefined ? String(existing.value) : undefined,
+        oldValue:
+          existing?.value !== undefined ? String(existing.value) : undefined,
         newValue,
         notes,
       };
@@ -170,10 +175,14 @@ export function useGRMEData() {
   const getIndicatorScore = useCallback(
     (indicatorId: string): number | null => {
       const data = cityData.indicators[indicatorId];
-      if (data === undefined || data.value === null || data.value === undefined) {
+      if (
+        data === undefined ||
+        data.value === null ||
+        data.value === undefined
+      ) {
         return null;
       }
-      const indicator = findIndicator(indicatorId);
+      const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
       if (!indicator) return null;
       if (typeof data.value === "string") return null;
       return calculateIndicatorScore(data.value, indicator);
@@ -183,7 +192,7 @@ export function useGRMEData() {
 
   const getDomainScore = useCallback(
     (domainId: string): number => {
-      const domain = DOMAINS.find((d) => d.id === domainId);
+      const domain = domainsRef.current.find((d) => d.id === domainId);
       if (!domain) return 50;
       return calculateDomainScore(domain, getIndicatorScore);
     },
@@ -191,7 +200,7 @@ export function useGRMEData() {
   );
 
   const getOverallScore = useCallback((): number => {
-    const scores = DOMAINS.map((d) => getDomainScore(d.id));
+    const scores = domainsRef.current.map((d) => getDomainScore(d.id));
     return scores.reduce((a, b) => a + b, 0) / scores.length;
   }, [getDomainScore]);
 
@@ -200,13 +209,17 @@ export function useGRMEData() {
     filled: number;
     percentage: number;
   } => {
-    const total = DOMAINS.reduce(
+    const total = domainsRef.current.reduce(
       (sum, d) =>
         sum + d.subdomains.reduce((s, sub) => s + sub.indicators.length, 0),
       0
     );
     const filled = Object.keys(cityData.indicators).length;
-    return { total, filled, percentage: Math.round((filled / total) * 100) };
+    return {
+      total,
+      filled,
+      percentage: total > 0 ? Math.round((filled / total) * 100) : 0,
+    };
   }, [cityData]);
 
   return {

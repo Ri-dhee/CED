@@ -184,7 +184,7 @@ export function calculateDomainScore(
 export function calculateOverallScore(
   getDomainScore: (id: string) => number
 ): number {
-  const scores = DOMAINS.map((d) => getDomainScore(d.id));
+  const scores = DEFAULT_DOMAINS.map((d) => getDomainScore(d.id));
   return scores.reduce((a, b) => a + b, 0) / scores.length;
 }
 
@@ -207,7 +207,7 @@ export function isLowerBetter(indicator: Indicator): boolean {
   return indicator.direction === "lower";
 }
 
-export const DOMAINS: Domain[] = [
+export const DEFAULT_DOMAINS: Domain[] = [
   {
     id: "safety-security",
     name: "Safety and Security",
@@ -1304,7 +1304,7 @@ export const CITIES: { id: string; name: string }[] = [
 ];
 
 export function getAllIndicators(): (Indicator & { domainId: string; subdomainId: string })[] {
-  return DOMAINS.flatMap((d) =>
+  return DEFAULT_DOMAINS.flatMap((d) =>
     d.subdomains.flatMap((s) =>
       s.indicators.map((i) => ({
         ...i,
@@ -1314,3 +1314,6 @@ export function getAllIndicators(): (Indicator & { domainId: string; subdomainId
     )
   );
 }
+
+/** @deprecated Use DEFAULT_DOMAINS or pass domains as a prop instead. */
+export const DOMAINS = DEFAULT_DOMAINS;
