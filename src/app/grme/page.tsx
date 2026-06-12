@@ -505,20 +505,17 @@ export default function GRMEPage() {
               domains={framework.domains}
               pendingProposals={framework.pendingProposals}
               reviewedProposals={framework.reviewedProposals}
-              onAddDomain={framework.proposeAddDomain}
-              onEditDomain={framework.proposeEditDomain}
-              onDeleteDomain={framework.proposeDeleteDomain}
-              onAddSubDomain={framework.proposeAddSubDomain}
-              onEditSubDomain={framework.proposeEditSubDomain}
-              onDeleteSubDomain={framework.proposeDeleteSubDomain}
-              onAddIndicator={framework.proposeAddIndicator}
-              onEditIndicator={framework.proposeEditIndicator}
-              onDeleteIndicator={framework.proposeDeleteIndicator}
+              onUpdateDomain={framework.updateDomainField}
+              onUpdateSubDomain={framework.updateSubDomainField}
+              onUpdateIndicator={framework.updateIndicatorField}
+              onAddDomain={framework.addDomainDirect}
+              onAddSubDomain={framework.addSubDomainDirect}
+              onAddIndicator={framework.addIndicatorDirect}
+              onDeleteDomain={framework.deleteDomainDirect}
+              onDeleteSubDomain={framework.deleteSubDomainDirect}
+              onDeleteIndicator={framework.deleteIndicatorDirect}
               onApprove={framework.approveProposal}
               onReject={framework.rejectProposal}
-              newDomain={framework.newDomain}
-              newSubDomain={framework.newSubDomain}
-              newIndicator={framework.newIndicator}
             />
           </div>
         </section>

@@ -187,6 +187,223 @@ export function useGRMEFramework() {
     [domains, proposals, persist]
   );
 
+  // ── Direct Update (spreadsheet inline editing) ──────────────
+
+  const updateDomainField = useCallback(
+    (domainId: string, field: string, value: string) => {
+      const newDomains = domains.map((d) => {
+        if (d.id !== domainId) return d;
+        const updated = { ...d };
+        if (field === "name") updated.name = value;
+        else if (field === "shortName") updated.shortName = value;
+        else if (field === "id") updated.id = value;
+        else if (field === "description") updated.description = value;
+        else if (field === "color") updated.color = value;
+        else if (field === "icon") updated.icon = value;
+        return updated;
+      });
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  const updateSubDomainField = useCallback(
+    (domainId: string, subId: string, field: string, value: string) => {
+      const newDomains = domains.map((d) => {
+        if (d.id !== domainId) return d;
+        return {
+          ...d,
+          subdomains: d.subdomains.map((s) => {
+            if (s.id !== subId) return s;
+            if (field === "name") return { ...s, name: value };
+            if (field === "id") return { ...s, id: value };
+            return s;
+          }),
+        };
+      });
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  const updateIndicatorField = useCallback(
+    (
+      domainId: string,
+      subId: string,
+      indId: string,
+      field: string,
+      value: string
+    ) => {
+      const newDomains = domains.map((d) => {
+        if (d.id !== domainId) return d;
+        return {
+          ...d,
+          subdomains: d.subdomains.map((s) => {
+            if (s.id !== subId) return s;
+            return {
+              ...s,
+              indicators: s.indicators.map((ind) => {
+                if (ind.id !== indId) return ind;
+                if (field === "name") return { ...ind, name: value };
+                if (field === "id") return { ...ind, id: value };
+                if (field === "type")
+                  return { ...ind, type: value as Indicator["type"] };
+                if (field === "dataType")
+                  return { ...ind, dataType: value as Indicator["dataType"] };
+                if (field === "unit") return { ...ind, unit: value };
+                if (field === "direction")
+                  return { ...ind, direction: value as Indicator["direction"] };
+                if (field === "description")
+                  return { ...ind, description: value };
+                if (field === "source")
+                  return { ...ind, source: value || undefined };
+                if (field.startsWith("benchmark.")) {
+                  const key = field.split(".")[1] as
+                    | "critical"
+                    | "developing"
+                    | "progressive"
+                    | "exemplary";
+                  return {
+                    ...ind,
+                    benchmark: { ...ind.benchmark, [key]: value },
+                  };
+                }
+                return ind;
+              }),
+            };
+          }),
+        };
+      });
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  // ── Direct Add (spreadsheet) ────────────────────────────────
+
+  const addDomainDirect = useCallback(() => {
+    const d = newDomain();
+    d.name = "New Domain";
+    d.shortName = "New";
+    const newDomains = [...domains, d];
+    setDomains(newDomains);
+    saveFramework({
+      domains: newDomains,
+      proposals,
+      lastUpdated: new Date().toISOString(),
+    });
+  }, [domains, proposals]);
+
+  const addSubDomainDirect = useCallback(
+    (domainId: string) => {
+      const s = newSubDomain();
+      s.name = "New Sub-Domain";
+      const newDomains = domains.map((d) =>
+        d.id === domainId ? { ...d, subdomains: [...d.subdomains, s] } : d
+      );
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  const addIndicatorDirect = useCallback(
+    (domainId: string, subId: string) => {
+      const ind = newIndicator();
+      ind.name = "New Indicator";
+      const newDomains = domains.map((d) => {
+        if (d.id !== domainId) return d;
+        return {
+          ...d,
+          subdomains: d.subdomains.map((s) =>
+            s.id === subId ? { ...s, indicators: [...s.indicators, ind] } : s
+          ),
+        };
+      });
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  // ── Direct Delete (spreadsheet) ─────────────────────────────
+
+  const deleteDomainDirect = useCallback(
+    (domainId: string) => {
+      const newDomains = domains.filter((d) => d.id !== domainId);
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  const deleteSubDomainDirect = useCallback(
+    (domainId: string, subId: string) => {
+      const newDomains = domains.map((d) =>
+        d.id === domainId
+          ? { ...d, subdomains: d.subdomains.filter((s) => s.id !== subId) }
+          : d
+      );
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
+  const deleteIndicatorDirect = useCallback(
+    (domainId: string, subId: string, indId: string) => {
+      const newDomains = domains.map((d) => {
+        if (d.id !== domainId) return d;
+        return {
+          ...d,
+          subdomains: d.subdomains.map((s) =>
+            s.id === subId
+              ? { ...s, indicators: s.indicators.filter((i) => i.id !== indId) }
+              : s
+          ),
+        };
+      });
+      setDomains(newDomains);
+      saveFramework({
+        domains: newDomains,
+        proposals,
+        lastUpdated: new Date().toISOString(),
+      });
+    },
+    [domains, proposals]
+  );
+
   // ── Proposal Management ─────────────────────────────────────
 
   const approveProposal = useCallback(
@@ -324,5 +541,16 @@ export function useGRMEFramework() {
     newSubDomain,
     newIndicator,
     generateEntityId,
+
+    // Direct spreadsheet updates
+    updateDomainField,
+    updateSubDomainField,
+    updateIndicatorField,
+    addDomainDirect,
+    addSubDomainDirect,
+    addIndicatorDirect,
+    deleteDomainDirect,
+    deleteSubDomainDirect,
+    deleteIndicatorDirect,
   };
 }
