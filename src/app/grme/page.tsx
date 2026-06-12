@@ -16,6 +16,9 @@ import {
   exportSummaryCsv,
 } from "@/lib/grme-export";
 import RadarChart from "@/components/grme/RadarChart";
+import BarChart from "@/components/grme/BarChart";
+import ProgressRings from "@/components/grme/ProgressRings";
+import ComparisonView from "@/components/grme/ComparisonView";
 import DataEntryForm from "@/components/grme/DataEntryForm";
 import AuditPanel from "@/components/grme/AuditPanel";
 import FrameworkEditor from "@/components/grme/FrameworkEditor";
@@ -158,6 +161,12 @@ function GRMEApp({
     });
     return result;
   }, [framework.domains, getDomainScore]);
+
+  const previousYear = useMemo(() => {
+    const sortedYears = [...availableYears].sort((a, b) => a - b);
+    const currentIdx = sortedYears.indexOf(selectedYear);
+    return currentIdx > 0 ? sortedYears[currentIdx - 1] : null;
+  }, [availableYears, selectedYear]);
 
   const overallScore = useMemo(() => getOverallScore(), [getOverallScore]);
   const stats = useMemo(() => getDataEntryStats(), [getDataEntryStats]);
@@ -355,106 +364,53 @@ function GRMEApp({
       {activeTab === "dashboard" && (
         <section className="pb-12" role="tabpanel" id="panel-dashboard" aria-labelledby="tab-dashboard">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  Domain Profile
-                </h2>
+            {/* Top row: Radar + Progress Rings */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Domain Profile
+                  </h2>
+                </div>
                 <div className="max-w-md mx-auto">
                   <RadarChart
                     domains={framework.domains}
                     getDomainScore={getDomainScore}
                     size={400}
+                    onDomainClick={(id) => {
+                      if (canEdit) {
+                        setSelectedDomain(id);
+                        setSelectedSubdomain(
+                          framework.domains.find((d) => d.id === id)?.subdomains[0]?.id || ""
+                        );
+                        setActiveTab("entry");
+                      }
+                    }}
                   />
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  Domain Scores
+                  Progress
                 </h2>
-                <div className="space-y-3">
-                  {framework.domains.map((domain) => {
-                    const score = domainScores[domain.id];
-                    const status = getStatusFromScore(score);
-                    const color = getStatusColor(status);
-                    const filled = domain.subdomains
-                      .flatMap((s) => s.indicators)
-                      .filter(
-                        (i) => assessment.indicators[i.id]?.value !== undefined
-                      ).length;
-                    const total = domain.subdomains.flatMap(
-                      (s) => s.indicators
-                    ).length;
-
-                    return (
-                      <div
-                        key={domain.id}
-                        className="p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer"
-                        onClick={() => {
-                          if (canEdit) {
-                            setSelectedDomain(domain.id);
-                            setSelectedSubdomain(
-                              domain.subdomains[0]?.id || ""
-                            );
-                            setActiveTab("entry");
-                          }
-                        }}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: domain.color }}
-                            />
-                            <span className="text-sm font-medium text-gray-800">
-                              {domain.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">
-                              {filled}/{total}
-                            </span>
-                            <span
-                              className="text-sm font-bold"
-                              style={{ color }}
-                            >
-                              {Math.round(score)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${score}%`,
-                              backgroundColor: color,
-                            }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between mt-1.5">
-                          <span
-                            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                            style={{
-                              backgroundColor: getStatusBg(status),
-                              color,
-                            }}
-                          >
-                            {status}
-                          </span>
-                          {canEdit && (
-                            <span className="text-[10px] text-gray-400">
-                              Click to enter data →
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ProgressRings
+                  domains={framework.domains}
+                  getDomainScore={getDomainScore}
+                  onDomainClick={(id) => {
+                    if (canEdit && id !== "overall") {
+                      setSelectedDomain(id);
+                      setSelectedSubdomain(
+                        framework.domains.find((d) => d.id === id)?.subdomains[0]?.id || ""
+                      );
+                      setActiveTab("entry");
+                    }
+                  }}
+                />
               </div>
             </div>
 
+            {/* Stats row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center">
                 <div className="text-3xl font-bold gradient-text mb-1">
@@ -484,8 +440,57 @@ function GRMEApp({
               </div>
             </div>
 
+            {/* Bar Chart */}
+            <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                Domain Comparison
+              </h2>
+              <BarChart
+                domains={framework.domains}
+                getDomainScore={getDomainScore}
+                onDomainClick={(id) => {
+                  if (canEdit) {
+                    setSelectedDomain(id);
+                    setSelectedSubdomain(
+                      framework.domains.find((d) => d.id === id)?.subdomains[0]?.id || ""
+                    );
+                    setActiveTab("entry");
+                  }
+                }}
+              />
+            </div>
+
+            {/* Comparison View (when 2+ years) */}
+            {availableYears.length >= 2 && previousYear && (
+              <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Year-over-Year Comparison
+                  </h2>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="px-2 py-1 bg-gray-100 rounded text-gray-600 font-medium">
+                      {previousYear}
+                    </span>
+                    <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded font-medium">
+                      {selectedYear}
+                    </span>
+                  </div>
+                </div>
+                <ComparisonView
+                  domains={framework.domains}
+                  currentYear={selectedYear}
+                  previousYear={previousYear}
+                  getCurrentDomainScore={getDomainScore}
+                  getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, previousYear)}
+                />
+              </div>
+            )}
+
             {/* Year-over-year trend (show when 2+ years exist) */}
-              {availableYears.length >= 2 && (
+            {availableYears.length >= 2 && (
               <div className="mt-6">
                 <TrendChart
                   years={availableYears}
