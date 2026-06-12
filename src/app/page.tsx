@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ContactForm from "@/components/ContactForm";
 
 const services = [
   {
@@ -277,31 +278,19 @@ export default function Home() {
       </section>
 
       <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <span className="text-sm font-semibold text-primary uppercase tracking-widest">Let&apos;s Collaborate</span>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
-            Ready to Make a <span className="gradient-text">Difference</span>?
-          </h2>
-          <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-10">
-            Partner with CED to transform your environmental challenges into
-            opportunities for sustainable growth.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link
-              href="/partners"
-              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105"
-            >
-              Get in Touch
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
-            <Link
-              href="/experience"
-              className="inline-flex items-center px-8 py-4 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:border-primary hover:text-primary transition-all"
-            >
-              View Case Studies
-            </Link>
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <span className="text-sm font-semibold text-primary uppercase tracking-widest">Let&apos;s Collaborate</span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+              Ready to Make a <span className="gradient-text">Difference</span>?
+            </h2>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+              Partner with CED to transform your environmental challenges into
+              opportunities for sustainable growth.
+            </p>
+          </div>
+          <div className="bg-gradient-to-br from-slate-50 to-emerald-50 rounded-3xl p-8 md:p-12 border border-gray-100">
+            <ContactForm />
           </div>
         </div>
       </section>
