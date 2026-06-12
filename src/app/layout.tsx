@@ -45,7 +45,13 @@ export const metadata: Metadata = {
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/experience", label: "Experience" },
+  {
+    label: "Experience",
+    children: [
+      { href: "/experience", label: "Experience" },
+      { href: "/grme", label: "GRME Index" },
+    ],
+  },
   { href: "/partners", label: "Partners" },
   { href: "/photos", label: "Photos" },
 ];
@@ -105,16 +111,45 @@ export default function RootLayout({
               </div>
             </Link>
             <div className="hidden lg:flex items-center gap-1" role="menubar">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  role="menuitem"
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary rounded-lg hover:bg-primary/5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-primary/5"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) =>
+                link.children ? (
+                  <div key={link.label} className="relative group">
+                    <button
+                      role="menuitem"
+                      aria-haspopup="true"
+                      className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary rounded-lg hover:bg-primary/5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-primary/5 flex items-center gap-1"
+                    >
+                      {link.label}
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="absolute left-0 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                      <div className="bg-white rounded-xl shadow-lg border border-gray-100 py-2 min-w-[160px]">
+                        {link.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            role="menuitem"
+                            className="block px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary hover:bg-primary/5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-primary/5"
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    role="menuitem"
+                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary rounded-lg hover:bg-primary/5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-primary/5"
+                  >
+                    {link.label}
+                  </Link>
+                )
+              )}
             </div>
             <MobileNav />
           </nav>
@@ -162,15 +197,27 @@ export default function RootLayout({
                 </h3>
                 <nav aria-label="Footer navigation">
                   <div className="flex flex-col gap-3">
-                    {navLinks.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        className="text-white/50 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
+                    {navLinks.map((link) =>
+                      link.children ? (
+                        link.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className="text-white/50 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
+                          >
+                            {child.label}
+                          </Link>
+                        ))
+                      ) : (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          className="text-white/50 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
+                        >
+                          {link.label}
+                        </Link>
+                      )
+                    )}
                   </div>
                 </nav>
               </div>
