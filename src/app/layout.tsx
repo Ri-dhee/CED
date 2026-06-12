@@ -67,6 +67,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <meta name="theme-color" content="#059669" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -107,7 +108,7 @@ export default function RootLayout({
                 <span className="font-bold text-gray-900 block leading-tight">
                   Center for Environment
                 </span>
-                <span className="text-xs text-gray-500">& Development</span>
+                <span className="text-xs text-gray-600">& Development</span>
               </div>
             </Link>
             <div className="hidden lg:flex items-center gap-1" role="menubar">
@@ -167,27 +168,33 @@ export default function RootLayout({
                     <span className="font-bold text-white block leading-tight">
                       Center for Environment
                     </span>
-                    <span className="text-xs text-white/50">
+                    <span className="text-xs text-white/60">
                       & Development
                     </span>
                   </div>
                 </div>
-                <p className="text-white/60 text-sm leading-relaxed mb-6">
+                <p className="text-white/70 text-sm leading-relaxed mb-6">
                   Empowering sustainable futures through expert consultation,
                   innovative solutions, and unwavering commitment to
                   environmental stewardship.
                 </p>
                 <div className="flex gap-3" role="list" aria-label="Social media links">
-                  {["in", "x", "fb"].map((s) => (
-                    <span
-                      key={s}
+                  {[
+                    { label: "LinkedIn", href: "#" },
+                    { label: "X", href: "#" },
+                    { label: "Facebook", href: "#" },
+                  ].map((social) => (
+                    <a
+                      key={social.label}
+                      href={social.href}
                       role="listitem"
-                      className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-white/40 text-xs font-bold hover:bg-white/20 hover:text-white transition-all cursor-pointer"
-                      aria-label={`${s} social link`}
-                      tabIndex={0}
+                      className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-white/60 text-xs font-bold hover:bg-white/20 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label={social.label}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      {s}
-                    </span>
+                      {social.label.slice(0, 2)}
+                    </a>
                   ))}
                 </div>
               </div>
@@ -203,7 +210,7 @@ export default function RootLayout({
                           <Link
                             key={child.href}
                             href={child.href}
-                            className="text-white/50 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
+                            className="text-white/70 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
                           >
                             {child.label}
                           </Link>
@@ -212,7 +219,7 @@ export default function RootLayout({
                         <Link
                           key={link.href}
                           href={link.href}
-                          className="text-white/50 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
+                          className="text-white/70 text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light focus:text-white rounded px-1 -mx-1"
                         >
                           {link.label}
                         </Link>
@@ -225,19 +232,19 @@ export default function RootLayout({
                 <h3 className="font-semibold text-white mb-6 text-sm uppercase tracking-wider">
                   Services
                 </h3>
-                <div className="flex flex-col gap-3 text-white/50 text-sm">
-                  <span>Environmental Impact Assessment</span>
-                  <span>Sustainable Development Planning</span>
-                  <span>Policy Advisory</span>
-                  <span>Climate Risk Assessment</span>
-                  <span>Biodiversity Conservation</span>
-                </div>
+                <ul className="flex flex-col gap-3 text-white/70 text-sm list-none p-0">
+                  <li>Environmental Impact Assessment</li>
+                  <li>Sustainable Development Planning</li>
+                  <li>Policy Advisory</li>
+                  <li>Climate Risk Assessment</li>
+                  <li>Biodiversity Conservation</li>
+                </ul>
               </div>
               <div>
                 <h3 className="font-semibold text-white mb-6 text-sm uppercase tracking-wider">
                   Contact
                 </h3>
-                <div className="flex flex-col gap-3 text-white/50 text-sm">
+                <div className="flex flex-col gap-3 text-white/70 text-sm">
                   <div className="flex items-start gap-3">
                     <svg className="w-4 h-4 mt-0.5 text-primary-light shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -260,7 +267,7 @@ export default function RootLayout({
                 </div>
               </div>
             </div>
-            <div className="border-t border-white/5 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/30">
+            <div className="border-t border-white/10 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/60">
               <span>&copy; {new Date().getFullYear()} CED. All rights reserved.</span>
               <span>Committed to a sustainable future.</span>
             </div>

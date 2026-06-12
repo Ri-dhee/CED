@@ -8,12 +8,12 @@ export default function NotFound() {
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Page Not Found
         </h1>
-        <p className="text-gray-500 text-lg max-w-md mx-auto mb-8">
+        <p className="text-gray-600 text-lg max-w-md mx-auto mb-8">
           The page you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
         <Link
           href="/"
-          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105"
+          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         >
           Return Home
           <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

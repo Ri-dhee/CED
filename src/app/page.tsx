@@ -6,7 +6,7 @@ const services = [
     description:
       "Comprehensive EIA services ensuring regulatory compliance and environmental protection for projects of every scale.",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
@@ -16,7 +16,7 @@ const services = [
     description:
       "Strategic urban and rural development planning that balances economic growth with environmental stewardship.",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
       </svg>
     ),
@@ -26,7 +26,7 @@ const services = [
     description:
       "Evidence-based policy recommendations for governments and organizations on environmental regulations and sustainability frameworks.",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     ),
@@ -36,7 +36,7 @@ const services = [
     description:
       "Advanced climate modeling and risk analysis to help organizations prepare for and adapt to climate change impacts.",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
@@ -46,7 +46,7 @@ const services = [
     description:
       "Ecosystem assessment and conservation strategy development for protecting biodiversity in development projects.",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
       </svg>
     ),
@@ -56,7 +56,7 @@ const services = [
     description:
       "Training programs and workshops to empower communities and organizations with the skills needed for sustainable development.",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     ),
@@ -96,7 +96,7 @@ const stats = [
 export default function Home() {
   return (
     <div>
-      <section className="relative min-h-[90vh] sm:min-h-screen flex items-center bg-gradient-to-br from-slate-50 via-white to-emerald-50 overflow-hidden">
+      <section aria-label="Hero" className="relative min-h-[90vh] sm:min-h-screen flex items-center bg-gradient-to-br from-slate-50 via-white to-emerald-50 overflow-hidden">
         <div className="hero-glow top-20 -left-20" />
         <div className="hero-glow bottom-20 -right-20" style={{ animationDelay: "-3s" }} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 sm:pt-32 pb-16 sm:pb-24 relative z-10">
@@ -110,7 +110,7 @@ export default function Home() {
                 Sustainable Solutions for{" "}
                 <span className="gradient-text">Environment & Development</span>
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-gray-500 leading-relaxed mb-6 sm:mb-10 max-w-xl animate-fade-in-up-delay-1">
+              <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed mb-6 sm:mb-10 max-w-xl animate-fade-in-up-delay-1">
                 CED is a premier private consultation firm bridging the gap
                 between environmental sustainability and developmental growth
                 through expert guidance and innovative strategies.
@@ -118,7 +118,7 @@ export default function Home() {
               <div className="flex flex-wrap gap-3 sm:gap-4 animate-fade-in-up-delay-2">
                 <Link
                   href="/experience"
-                  className="group inline-flex items-center px-5 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105 text-sm sm:text-base"
+                  className="group inline-flex items-center px-5 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 >
                   Explore Our Work
                   <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@ export default function Home() {
                 </Link>
                 <Link
                   href="/partners"
-                  className="inline-flex items-center px-5 sm:px-8 py-3 sm:py-4 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:border-primary hover:text-primary transition-all text-sm sm:text-base"
+                  className="inline-flex items-center px-5 sm:px-8 py-3 sm:py-4 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:border-primary hover:text-primary transition-all text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 >
                   Our Partners
                 </Link>
@@ -141,7 +141,7 @@ export default function Home() {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-emerald-50 to-white rounded-[32px] shadow-2xl border border-white/50 flex items-center justify-center backdrop-blur">
                   <div className="text-center">
                     <div className="text-6xl font-bold gradient-text">15+</div>
-                    <div className="text-sm text-gray-500 mt-2">Years of Impact</div>
+                    <div className="text-sm text-gray-600 mt-2">Years of Impact</div>
                   </div>
                 </div>
               </div>
@@ -150,14 +150,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-white relative">
+      <section aria-label="About us" className="py-16 sm:py-24 bg-white relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10 sm:mb-16">
             <span className="text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest">About Us</span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Shaping a <span className="gradient-text">Sustainable Tomorrow</span>
             </h2>
-            <p className="text-gray-500 max-w-3xl mx-auto text-base sm:text-lg leading-relaxed">
+            <p className="text-gray-600 max-w-3xl mx-auto text-base sm:text-lg leading-relaxed">
               At CED, we believe that environmental stewardship and developmental
               progress are not opposing forces — they are partners in building a
               resilient future.
@@ -195,7 +195,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-slate-50 relative overflow-hidden">
+      <section aria-label="Our impact in numbers" className="py-16 sm:py-24 bg-slate-50 relative overflow-hidden">
         <div className="hero-glow top-0 right-0" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10 sm:mb-16">
@@ -204,27 +204,27 @@ export default function Home() {
               Our Impact in <span className="gradient-text">Numbers</span>
             </h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
+          <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
             {stats.map((stat, i) => (
               <div key={i} className="bg-white rounded-2xl p-6 text-center shadow-sm border border-gray-100 hover:shadow-lg hover:border-primary/20 transition-all group">
-                <div className="text-3xl md:text-4xl font-bold gradient-text mb-1">
+                <dt className="text-3xl md:text-4xl font-bold gradient-text mb-1">
                   {stat.value}
-                </div>
-                <div className="text-xs text-gray-500 font-medium">{stat.label}</div>
+                </dt>
+                <dd className="text-xs text-gray-600 font-medium">{stat.label}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-white">
+      <section aria-label="Our services" className="py-16 sm:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10 sm:mb-16">
             <span className="text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest">What We Do</span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Our <span className="gradient-text">Services</span>
             </h2>
-            <p className="text-gray-500 max-w-2xl mx-auto text-sm sm:text-base">
+            <p className="text-gray-600 max-w-2xl mx-auto text-sm sm:text-base">
               End-to-end environmental consultation tailored to your unique challenges and goals.
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function Home() {
                 <h3 className="text-lg font-bold text-gray-900 mb-3">
                   {service.title}
                 </h3>
-                <p className="text-gray-500 text-sm leading-relaxed">
+                <p className="text-gray-600 text-sm leading-relaxed">
                   {service.description}
                 </p>
               </div>
@@ -249,7 +249,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-primary-deeper via-primary-dark to-primary-deeper text-white relative overflow-hidden">
+      <section aria-label="Testimonials" className="py-16 sm:py-24 bg-gradient-to-br from-primary-deeper via-primary-dark to-primary-deeper text-white relative overflow-hidden">
         <div className="hero-glow top-10 left-10 opacity-30" />
         <div className="hero-glow bottom-10 right-10 opacity-30" style={{ animationDelay: "-4s" }} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
@@ -261,28 +261,30 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
             {testimonials.map((t, i) => (
-              <div key={i} className="bg-white/5 backdrop-blur rounded-2xl p-6 sm:p-8 border border-white/10 hover:bg-white/10 transition-all">
-                <svg className="w-8 h-8 text-accent/40 mb-4" fill="currentColor" viewBox="0 0 24 24">
+              <blockquote key={i} className="bg-white/5 backdrop-blur rounded-2xl p-6 sm:p-8 border border-white/10 hover:bg-white/10 transition-all">
+                <svg className="w-8 h-8 text-accent/40 mb-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
                 </svg>
                 <p className="text-white/80 leading-relaxed mb-6">&ldquo;{t.quote}&rdquo;</p>
-                <div>
-                  <div className="font-semibold text-white">{t.author}</div>
-                  <div className="text-sm text-white/50">{t.role}</div>
-                </div>
-              </div>
+                <footer>
+                  <cite className="not-italic">
+                    <div className="font-semibold text-white">{t.author}</div>
+                    <div className="text-sm text-white/60">{t.role}</div>
+                  </cite>
+                </footer>
+              </blockquote>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-white">
+      <section aria-label="Contact" className="py-16 sm:py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <span className="text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest">Let&apos;s Collaborate</span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
             Ready to Make a <span className="gradient-text">Difference</span>?
           </h2>
-          <p className="text-gray-500 text-base sm:text-lg max-w-2xl mx-auto mb-6 sm:mb-10">
+          <p className="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto mb-6 sm:mb-10">
             Partner with CED to transform your environmental challenges into
             opportunities for sustainable growth.
           </p>
@@ -290,7 +292,7 @@ export default function Home() {
             href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@ced-consult.com&subject=CED%20Inquiry"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105 text-sm sm:text-base"
+            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-105 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
