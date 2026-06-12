@@ -1,15 +1,15 @@
 "use client";
 
-import { DOMAINS, getScoreColor } from "@/lib/grme-data";
+import { DOMAINS, getStatusColor, getStatusScore, getStatus } from "@/lib/grme-data";
 
 interface RadarChartProps {
-  scores: Record<string, number>;
+  getDomainScore: (domainId: string) => number;
   size?: number;
 }
 
-export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
+export default function RadarChart({ getDomainScore, size = 400 }: RadarChartProps) {
   const center = size / 2;
-  const radius = (size / 2) * 0.7;
+  const radius = (size / 2) * 0.65;
   const levels = 4;
   const angleStep = (2 * Math.PI) / DOMAINS.length;
 
@@ -22,9 +22,10 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
     };
   };
 
+  const scores = DOMAINS.map((d) => getDomainScore(d.id));
+
   const getPolygonPoints = () => {
-    return DOMAINS.map((domain, i) => {
-      const score = scores[domain.id] ?? 50;
+    return scores.map((score, i) => {
       const point = getPoint(i, score);
       return `${point.x},${point.y}`;
     }).join(" ");
@@ -38,6 +39,9 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
     }).join(" ");
   });
 
+  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const avgStatus = getStatus(avgScore, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any);
+
   return (
     <div className="relative">
       <svg
@@ -45,7 +49,6 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
         className="w-full h-full"
         aria-label="Radar chart showing domain scores"
       >
-        {/* Background circles */}
         {gridLevels.map((points, i) => (
           <polygon
             key={i}
@@ -53,11 +56,10 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
             fill="none"
             stroke="#e5e7eb"
             strokeWidth="1"
-            opacity={0.5 + (i / levels) * 0.5}
+            opacity={0.4 + (i / levels) * 0.6}
           />
         ))}
 
-        {/* Axis lines */}
         {DOMAINS.map((_, i) => {
           const point = getPoint(i, 100);
           return (
@@ -73,42 +75,43 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
           );
         })}
 
-        {/* Score polygon */}
         <polygon
           points={getPolygonPoints()}
-          fill="rgba(5, 150, 105, 0.2)"
+          fill="rgba(5, 150, 105, 0.15)"
           stroke="#059669"
-          strokeWidth="2"
+          strokeWidth="2.5"
         />
 
-        {/* Score points */}
         {DOMAINS.map((domain, i) => {
-          const score = scores[domain.id] ?? 50;
+          const score = scores[i];
           const point = getPoint(i, score);
+          const color = getStatusColor(getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
           return (
-            <circle
-              key={domain.id}
-              cx={point.x}
-              cy={point.y}
-              r="6"
-              fill={getScoreColor(score)}
-              stroke="white"
-              strokeWidth="2"
-            />
+            <g key={domain.id}>
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r="7"
+                fill={color}
+                stroke="white"
+                strokeWidth="2.5"
+              />
+            </g>
           );
         })}
 
-        {/* Labels */}
         {DOMAINS.map((domain, i) => {
-          const point = getPoint(i, 120);
-          const score = Math.round(scores[domain.id] ?? 50);
+          const point = getPoint(i, 125);
+          const score = Math.round(scores[i]);
+          const color = getStatusColor(getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any));
           return (
             <g key={domain.id}>
               <text
                 x={point.x}
-                y={point.y - 8}
+                y={point.y - 10}
                 textAnchor="middle"
-                className="text-[10px] font-semibold fill-gray-700"
+                className="text-[11px] font-semibold"
+                fill="#374151"
               >
                 {domain.shortName}
               </text>
@@ -116,8 +119,8 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
                 x={point.x}
                 y={point.y + 6}
                 textAnchor="middle"
-                className="text-[10px] font-bold"
-                fill={getScoreColor(score)}
+                className="text-[13px] font-bold"
+                fill={color}
               >
                 {score}
               </text>
@@ -125,46 +128,25 @@ export default function RadarChart({ scores, size = 400 }: RadarChartProps) {
           );
         })}
 
-        {/* Center label */}
         <text
           x={center}
-          y={center - 8}
+          y={center - 10}
           textAnchor="middle"
-          className="text-xs font-semibold fill-gray-500"
+          className="text-[11px] font-semibold"
+          fill="#9ca3af"
         >
           GRME
         </text>
         <text
           x={center}
-          y={center + 8}
+          y={center + 12}
           textAnchor="middle"
-          className="text-lg font-bold fill-primary"
+          className="text-[22px] font-bold"
+          fill={getStatusColor(avgStatus)}
         >
-          {Math.round(
-            Object.values(scores).reduce((a, b) => a + b, 0) / DOMAINS.length
-          )}
+          {Math.round(avgScore)}
         </text>
       </svg>
-
-      {/* Legend */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 text-xs">
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-gray-500">Critical (0-25)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-amber-500" />
-          <span className="text-gray-500">Developing (26-50)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-blue-500" />
-          <span className="text-gray-500">Progressive (51-75)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-emerald-500" />
-          <span className="text-gray-500">Exemplary (76-100)</span>
-        </div>
-      </div>
     </div>
   );
 }

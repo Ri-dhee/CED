@@ -1,12 +1,14 @@
 "use client";
 
-import { Domain, getScoreColor, getScoreLabel } from "@/lib/grme-data";
+import { Domain, getStatus, getStatusColor, getStatusBg, getStatusScore } from "@/lib/grme-data";
 
 interface DomainCardProps {
   domain: Domain;
   score: number;
   isSelected: boolean;
   onClick: () => void;
+  filledCount: number;
+  totalCount: number;
 }
 
 const icons: Record<string, React.ReactNode> = {
@@ -57,9 +59,11 @@ export default function DomainCard({
   score,
   isSelected,
   onClick,
+  filledCount,
+  totalCount,
 }: DomainCardProps) {
-  const scoreColor = getScoreColor(score);
-  const scoreLabel = getScoreLabel(score);
+  const status = getStatus(score, { benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "75" } } as any);
+  const color = getStatusColor(status);
 
   return (
     <button
@@ -72,11 +76,8 @@ export default function DomainCard({
     >
       <div className="flex items-start gap-4">
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-          style={{
-            backgroundColor: `${domain.color}15`,
-            color: domain.color,
-          }}
+          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          style={{ backgroundColor: `${domain.color}15`, color: domain.color }}
         >
           {icons[domain.icon]}
         </div>
@@ -89,31 +90,22 @@ export default function DomainCard({
             <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${score}%`,
-                  backgroundColor: scoreColor,
-                }}
+                style={{ width: `${score}%`, backgroundColor: color }}
               />
             </div>
-            <span
-              className="text-sm font-bold shrink-0"
-              style={{ color: scoreColor }}
-            >
+            <span className="text-sm font-bold shrink-0" style={{ color }}>
               {Math.round(score)}
             </span>
           </div>
           <div className="mt-2 flex items-center gap-2">
             <span
               className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor: `${scoreColor}15`,
-                color: scoreColor,
-              }}
+              style={{ backgroundColor: getStatusBg(status), color }}
             >
-              {scoreLabel}
+              {status}
             </span>
             <span className="text-xs text-gray-400">
-              {domain.subdomains.length} sub-domains
+              {filledCount}/{totalCount} entered
             </span>
           </div>
         </div>

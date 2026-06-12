@@ -1,10 +1,34 @@
 export type IndicatorType = "Quantitative" | "Qualitative" | "Participatory";
+export type DataType = "percentage" | "number" | "ratio" | "index" | "text" | "boolean";
+export type ScoreStatus = "Critical" | "Developing" | "Progressive" | "Exemplary";
+
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: "create" | "update" | "review";
+  field: string;
+  oldValue?: string;
+  newValue: string;
+  notes?: string;
+}
+
+export interface Benchmark {
+  critical: string;
+  developing: string;
+  progressive: string;
+  exemplary: string;
+}
 
 export interface Indicator {
   id: string;
   name: string;
   type: IndicatorType;
+  dataType: DataType;
+  unit: string;
   description: string;
+  benchmark: Benchmark;
+  source?: string;
 }
 
 export interface SubDomain {
@@ -23,17 +47,61 @@ export interface Domain {
   subdomains: SubDomain[];
 }
 
-export interface DomainScore {
-  domainId: string;
-  score: number;
-  subdomainScores: { subdomainId: string; score: number }[];
+export interface IndicatorData {
+  indicatorId: string;
+  value: number | string | null;
+  evidence?: string;
+  notes?: string;
+  lastUpdated: string;
+  updatedBy: string;
 }
 
-export interface GRMEResult {
-  city: string;
+export interface AuditLog {
+  indicatorId: string;
+  entries: AuditEntry[];
+}
+
+export interface CityData {
+  cityId: string;
+  cityName: string;
   year: number;
-  domainScores: DomainScore[];
-  overallScore: number;
+  indicators: Record<string, IndicatorData>;
+  auditLog: AuditLog[];
+}
+
+export function getStatus(value: number, indicator: Indicator): ScoreStatus {
+  const b = indicator.benchmark;
+  if (value >= parseFloat(b.exemplary)) return "Exemplary";
+  if (value >= parseFloat(b.progressive)) return "Progressive";
+  if (value >= parseFloat(b.developing)) return "Developing";
+  return "Critical";
+}
+
+export function getStatusScore(status: ScoreStatus): number {
+  switch (status) {
+    case "Critical": return 12.5;
+    case "Developing": return 37.5;
+    case "Progressive": return 62.5;
+    case "Exemplary": return 87.5;
+  }
+}
+
+export function getStatusColor(status: ScoreStatus): string {
+  switch (status) {
+    case "Critical": return "#ef4444";
+    case "Developing": return "#f59e0b";
+    case "Progressive": return "#3b82f6";
+    case "Exemplary": return "#10b981";
+  }
+}
+
+export function getStatusBg(status: ScoreStatus): string {
+  switch (status) {
+    case "Critical": return "#fef2f2";
+    case "Developing": return "#fffbeb";
+    case "Progressive": return "#eff6ff";
+    case "Exemplary": return "#ecfdf5";
+  }
 }
 
 export const DOMAINS: Domain[] = [
@@ -41,8 +109,7 @@ export const DOMAINS: Domain[] = [
     id: "safety-security",
     name: "Safety and Security",
     shortName: "Safety",
-    description:
-      "Women's physical safety, freedom from violence, and sense of security in public and private spaces across diverse altitudes and terrains.",
+    description: "Women's physical safety, freedom from violence, and sense of security in public and private spaces across diverse altitudes and terrains.",
     icon: "shield",
     color: "#ef4444",
     subdomains: [
@@ -52,33 +119,48 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ss-1",
-            name: "% of women who feel safe walking alone in urban areas at night",
+            name: "% of women who feel safe walking alone at night",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Measures perceived safety in public spaces after dark",
+            benchmark: { critical: "0", developing: "30", progressive: "50", exemplary: "70" },
           },
           {
             id: "ss-2",
-            name: "Rate of gender-based violence (GBV) incidents reported in urban centres, disaggregated by type",
+            name: "Rate of GBV incidents per 10,000 women",
             type: "Quantitative",
-            description: "Tracks reported GBV cases by category",
+            dataType: "number",
+            unit: "per 10k",
+            description: "Reported GBV cases (lower is better)",
+            benchmark: { critical: "50", developing: "30", progressive: "15", exemplary: "5" },
           },
           {
             id: "ss-3",
-            name: "% of streets with adequate lighting, especially in hilly/steep zones",
+            name: "% of streets with adequate lighting",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Infrastructure safety measure",
+            benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
           },
           {
             id: "ss-4",
-            name: "Women's perception of safety at public transport nodes",
+            name: "Women's perception of safety at transport nodes",
             type: "Participatory",
-            description: "Women's lived experience of safety at transit points",
+            dataType: "index",
+            unit: "/10",
+            description: "Survey-based perception score",
+            benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
           },
           {
             id: "ss-5",
-            name: "Presence and functionality of accessible emergency call points in urban zones",
-            type: "Qualitative",
-            description: "Emergency response infrastructure",
+            name: "Emergency call points per 10km of urban roads",
+            type: "Quantitative",
+            dataType: "number",
+            unit: "per 10km",
+            description: "Emergency response infrastructure density",
+            benchmark: { critical: "0", developing: "2", progressive: "5", exemplary: "10" },
           },
         ],
       },
@@ -88,27 +170,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ss-6",
-            name: "Number of functional GBV response centres per 10,000 women",
+            name: "GBV response centres per 10,000 women",
             type: "Quantitative",
+            dataType: "number",
+            unit: "per 10k",
             description: "Access to GBV support services",
+            benchmark: { critical: "0", developing: "0.5", progressive: "1", exemplary: "2" },
           },
           {
             id: "ss-7",
-            name: "Average response time of law enforcement to GBV complaints",
+            name: "Average response time to GBV complaints (minutes)",
             type: "Quantitative",
-            description: "Institutional responsiveness",
+            dataType: "number",
+            unit: "minutes",
+            description: "Institutional responsiveness (lower is better)",
+            benchmark: { critical: "120", developing: "60", progressive: "30", exemplary: "15" },
           },
           {
             id: "ss-8",
-            name: "% of reported GBV cases reaching resolution in formal justice systems",
+            name: "% of GBV cases reaching resolution",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Justice system effectiveness",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "75" },
           },
           {
             id: "ss-9",
-            name: "Awareness among women of formal GBV complaint mechanisms",
+            name: "% of women aware of GBV complaint mechanisms",
             type: "Participatory",
+            dataType: "percentage",
+            unit: "%",
             description: "Knowledge of available support",
+            benchmark: { critical: "0", developing: "25", progressive: "50", exemplary: "80" },
           },
         ],
       },
@@ -118,21 +212,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ss-10",
-            name: "Prevalence of online harassment experienced by women in urban areas",
+            name: "% of women experiencing online harassment",
             type: "Quantitative",
-            description: "Digital violence metric",
+            dataType: "percentage",
+            unit: "%",
+            description: "Digital violence prevalence (lower is better)",
+            benchmark: { critical: "50", developing: "30", progressive: "15", exemplary: "5" },
           },
           {
             id: "ss-11",
-            name: "Existence of digital safety policies and enforcement mechanisms for platforms used locally",
+            name: "Digital safety policy implementation score",
             type: "Qualitative",
-            description: "Policy framework for digital safety",
+            dataType: "index",
+            unit: "/10",
+            description: "0=Non-existent, 10=Fully enforced",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
           {
             id: "ss-12",
-            name: "% of women aware of cyber-crime reporting channels",
+            name: "% of women aware of cyber-crime reporting",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Awareness of digital safety resources",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
         ],
       },
@@ -142,8 +245,7 @@ export const DOMAINS: Domain[] = [
     id: "mobility-access",
     name: "Mobility and Access",
     shortName: "Mobility",
-    description:
-      "Equitable, affordable, and terrain-adapted transport and mobility for women across Bhutan's steep, high-altitude urban settings.",
+    description: "Equitable, affordable, and terrain-adapted transport and mobility for women across Bhutan's steep, high-altitude urban settings.",
     icon: "map",
     color: "#3b82f6",
     subdomains: [
@@ -153,27 +255,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ma-1",
-            name: "% of women-headed households within 400m of a regular bus stop or shared transport node",
+            name: "% of women-headed households within 400m of transit",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Transit accessibility",
+            benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
           },
           {
             id: "ma-2",
-            name: "Gender disaggregated public transport ridership and satisfaction scores",
-            type: "Quantitative",
-            description: "Usage and satisfaction metrics",
+            name: "Transport satisfaction score (women)",
+            type: "Participatory",
+            dataType: "index",
+            unit: "/10",
+            description: "User satisfaction metric",
+            benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
           },
           {
             id: "ma-3",
-            name: "Affordability index: % of women's income spent on transport",
+            name: "% of income spent on transport (women)",
             type: "Quantitative",
-            description: "Transport cost burden",
+            dataType: "percentage",
+            unit: "%",
+            description: "Transport cost burden (lower is better)",
+            benchmark: { critical: "25", developing: "15", progressive: "10", exemplary: "5" },
           },
           {
             id: "ma-4",
-            name: "Presence of women-only seating or reserved space on public transport",
+            name: "Women-only seating availability score",
             type: "Qualitative",
-            description: "Gender-responsive transport design",
+            dataType: "index",
+            unit: "/10",
+            description: "Gender-responsive transport features",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -183,21 +297,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ma-5",
-            name: "% of pedestrian paths with handrails, adequate width, and non-slip surfaces in hilly zones",
+            name: "% of paths with handrails and non-slip surfaces",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Mountain-adapted pedestrian infrastructure",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "ma-6",
-            name: "Coverage of elevators or escalators at major public transit nodes for persons with disabilities and elderly women",
+            name: "% of transit nodes with elevators/escalators",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Accessibility infrastructure",
+            benchmark: { critical: "0", developing: "10", progressive: "30", exemplary: "60" },
           },
           {
             id: "ma-7",
-            name: "% of market areas, health facilities, and schools reachable without a vehicle",
+            name: "% of facilities reachable without vehicle",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Walkability metric",
+            benchmark: { critical: "0", developing: "30", progressive: "60", exemplary: "85" },
           },
         ],
       },
@@ -207,21 +330,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ma-8",
-            name: "Average travel time for women to access childcare, schools, and health facilities",
+            name: "Avg travel time to childcare/health (minutes)",
             type: "Quantitative",
-            description: "Care trip efficiency",
+            dataType: "number",
+            unit: "min",
+            description: "Care trip efficiency (lower is better)",
+            benchmark: { critical: "60", developing: "40", progressive: "25", exemplary: "15" },
           },
           {
             id: "ma-9",
-            name: "% of urban plans incorporating 'care trip chains' in transport modelling",
+            name: "% of plans incorporating care trip chains",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Planning integration of care needs",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "ma-10",
-            name: "Women's reported difficulty in combining work, care, and service access trips",
+            name: "Women's mobility difficulty score",
             type: "Participatory",
-            description: "Lived experience of mobility challenges",
+            dataType: "index",
+            unit: "/10",
+            description: "Lived experience (lower is better)",
+            benchmark: { critical: "8", developing: "6", progressive: "4", exemplary: "2" },
           },
         ],
       },
@@ -231,8 +363,7 @@ export const DOMAINS: Domain[] = [
     id: "housing-land",
     name: "Housing and Land",
     shortName: "Housing",
-    description:
-      "Secure tenure, affordable and climate-adapted housing, and women's legal access to land in Bhutan's urban growth areas.",
+    description: "Secure tenure, affordable and climate-adapted housing, and women's legal access to land in Bhutan's urban growth areas.",
     icon: "home",
     color: "#8b5cf6",
     subdomains: [
@@ -242,27 +373,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "hl-1",
-            name: "% of women with independent or joint land/housing title in urban areas",
+            name: "% of women with land/housing title",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Land ownership security",
+            benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
           },
           {
             id: "hl-2",
-            name: "% of registered urban plots with women as primary or co-owners",
+            name: "% of plots with women as co-owners",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Property registration metrics",
+            benchmark: { critical: "0", developing: "15", progressive: "30", exemplary: "50" },
           },
           {
             id: "hl-3",
-            name: "Legal barriers faced by divorced or widowed women in retaining housing",
+            name: "Legal barriers score for divorced/widowed women",
             type: "Qualitative",
-            description: "Legal framework assessment",
+            dataType: "index",
+            unit: "/10",
+            description: "0=Major barriers, 10=No barriers",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
           {
             id: "hl-4",
-            name: "% of urban housing allocation schemes with explicit gender equity criteria",
+            name: "% of housing schemes with gender criteria",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Policy inclusiveness",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
         ],
       },
@@ -272,27 +415,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "hl-5",
-            name: "% of women-headed households spending >30% of income on rent",
+            name: "% of women-headed households >30% income on rent",
             type: "Quantitative",
-            description: "Housing cost burden",
+            dataType: "percentage",
+            unit: "%",
+            description: "Housing cost burden (lower is better)",
+            benchmark: { critical: "60", developing: "40", progressive: "25", exemplary: "10" },
           },
           {
             id: "hl-6",
-            name: "Overcrowding index in women-headed households",
+            name: "Overcrowding index (women-headed households)",
             type: "Quantitative",
-            description: "Living conditions metric",
+            dataType: "index",
+            unit: "ratio",
+            description: "Persons per room (lower is better)",
+            benchmark: { critical: "3", developing: "2", progressive: "1.5", exemplary: "1" },
           },
           {
             id: "hl-7",
-            name: "Access to functional sanitation (private toilet) disaggregated by gender of household head",
+            name: "% with access to functional sanitation",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Basic services access",
+            benchmark: { critical: "0", developing: "40", progressive: "70", exemplary: "95" },
           },
           {
             id: "hl-8",
-            name: "Availability of affordable rental housing near employment centres for women migrants",
+            name: "Affordable rental housing availability score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Housing availability for migrant women",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -302,21 +457,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "hl-9",
-            name: "% of women-headed households in high seismic or landslide risk zones with retrofitted housing",
+            name: "% of housing retrofitted in high-risk zones",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Climate-resilient housing",
+            benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
           },
           {
             id: "hl-10",
-            name: "Inclusion of women in community-level disaster risk mapping processes",
+            name: "% of women included in disaster risk mapping",
             type: "Participatory",
+            dataType: "percentage",
+            unit: "%",
             description: "Participation in resilience planning",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "hl-11",
-            name: "% of women aware of housing insurance schemes or government disaster relief entitlements",
+            name: "% aware of housing insurance/relief schemes",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Awareness of protection mechanisms",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
         ],
       },
@@ -326,8 +490,7 @@ export const DOMAINS: Domain[] = [
     id: "economic-inclusion",
     name: "Economic Inclusion",
     shortName: "Economy",
-    description:
-      "Access to livelihoods, financial services, and economic agency in Bhutan's emerging urban economy.",
+    description: "Access to livelihoods, financial services, and economic agency in Bhutan's emerging urban economy.",
     icon: "chart",
     color: "#f59e0b",
     subdomains: [
@@ -337,27 +500,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ei-1",
-            name: "Gender wage gap in urban formal and informal sectors",
+            name: "Gender wage gap (%)",
             type: "Quantitative",
-            description: "Pay equity metric",
+            dataType: "percentage",
+            unit: "%",
+            description: "Pay equity (lower is better)",
+            benchmark: { critical: "40", developing: "25", progressive: "15", exemplary: "5" },
           },
           {
             id: "ei-2",
-            name: "% of women in urban workforce in managerial/decision-making roles",
+            name: "% of women in managerial roles",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Leadership representation",
+            benchmark: { critical: "0", developing: "10", progressive: "20", exemplary: "35" },
           },
           {
             id: "ei-3",
-            name: "% of urban women engaged in informal economy with access to social protection",
+            name: "% of informal workers with social protection",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Social safety net coverage",
+            benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "60" },
           },
           {
             id: "ei-4",
-            name: "Prevalence of unpaid care work hours per day for women vs men in urban households",
+            name: "Unpaid care work gap (women vs men hrs/day)",
             type: "Quantitative",
-            description: "Care work burden metric",
+            dataType: "number",
+            unit: "hrs",
+            description: "Care work burden gap (lower is better)",
+            benchmark: { critical: "6", developing: "4", progressive: "2", exemplary: "1" },
           },
         ],
       },
@@ -367,27 +542,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ei-5",
-            name: "% of urban small businesses owned by women with access to formal credit",
+            name: "% of women-owned businesses with formal credit",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Financial inclusion",
+            benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
           },
           {
             id: "ei-6",
-            name: "Gender disaggregated uptake of government enterprise support schemes",
+            name: "% uptake of enterprise support by women",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Government support accessibility",
+            benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "55" },
           },
           {
             id: "ei-7",
-            name: "Number of women-led cooperatives in urban commercial zones",
+            name: "Women-led cooperatives per 10,000 women",
             type: "Quantitative",
+            dataType: "number",
+            unit: "per 10k",
             description: "Collective economic empowerment",
+            benchmark: { critical: "0", developing: "1", progressive: "3", exemplary: "6" },
           },
           {
             id: "ei-8",
-            name: "Women's digital financial literacy and mobile banking usage rates",
+            name: "Digital financial literacy rate (women)",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Digital financial inclusion",
+            benchmark: { critical: "0", developing: "20", progressive: "45", exemplary: "70" },
           },
         ],
       },
@@ -397,21 +584,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ei-9",
-            name: "Coverage of subsidised or community childcare centres per 1,000 working-age women",
+            name: "Childcare centres per 1,000 working-age women",
             type: "Quantitative",
+            dataType: "number",
+            unit: "per 1k",
             description: "Childcare accessibility",
+            benchmark: { critical: "0", developing: "0.5", progressive: "1", exemplary: "2" },
           },
           {
             id: "ei-10",
-            name: "% of workplaces with lactation facilities and flexible working provisions",
+            name: "% of workplaces with lactation/flexible policies",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Workplace support infrastructure",
+            benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
           },
           {
             id: "ei-11",
-            name: "Women's self-reported barriers to employment due to care responsibilities",
+            name: "Care barriers to employment score",
             type: "Participatory",
-            description: "Lived experience of care barriers",
+            dataType: "index",
+            unit: "/10",
+            description: "0=No barriers, 10=Major barriers",
+            benchmark: { critical: "8", developing: "6", progressive: "4", exemplary: "2" },
           },
         ],
       },
@@ -421,8 +617,7 @@ export const DOMAINS: Domain[] = [
     id: "health-services",
     name: "Health and Services",
     shortName: "Health",
-    description:
-      "Equitable access to gender-responsive health, WASH, and social services in Bhutan's mountain urban centres.",
+    description: "Equitable access to gender-responsive health, WASH, and social services in Bhutan's mountain urban centres.",
     icon: "heart",
     color: "#ec4899",
     subdomains: [
@@ -432,27 +627,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "hs-1",
-            name: "% of urban women with access to a functional primary health centre within 30 minutes",
+            name: "% within 30min of primary health centre",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Healthcare accessibility",
+            benchmark: { critical: "0", developing: "30", progressive: "50", exemplary: "75" },
           },
           {
             id: "hs-2",
-            name: "Maternal mortality ratio in urban vs peri-urban zones",
+            name: "Maternal mortality ratio (per 100k)",
             type: "Quantitative",
-            description: "Maternal health outcome",
+            dataType: "number",
+            unit: "per 100k",
+            description: "Maternal health outcome (lower is better)",
+            benchmark: { critical: "300", developing: "150", progressive: "70", exemplary: "30" },
           },
           {
             id: "hs-3",
-            name: "Contraceptive prevalence rate and unmet need among urban women",
+            name: "Contraceptive prevalence rate (%)",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Reproductive health access",
+            benchmark: { critical: "0", developing: "30", progressive: "55", exemplary: "75" },
           },
           {
             id: "hs-4",
-            name: "Availability and use of menstrual health products in public spaces and workplaces",
+            name: "Menstrual health product availability score",
             type: "Qualitative",
-            description: "Menstrual health infrastructure",
+            dataType: "index",
+            unit: "/10",
+            description: "Infrastructure assessment",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -462,27 +669,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "hs-5",
-            name: "Prevalence of depression and anxiety among urban women, disaggregated by age",
+            name: "Prevalence of depression/anxiety (%)",
             type: "Quantitative",
-            description: "Mental health burden",
+            dataType: "percentage",
+            unit: "%",
+            description: "Mental health burden (lower is better)",
+            benchmark: { critical: "40", developing: "25", progressive: "15", exemplary: "8" },
           },
           {
             id: "hs-6",
-            name: "Number of trained mental health counsellors accessible to women per 10,000 population",
+            name: "Mental health counsellors per 10,000",
             type: "Quantitative",
-            description: "Mental health service capacity",
+            dataType: "number",
+            unit: "per 10k",
+            description: "Service capacity",
+            benchmark: { critical: "0", developing: "0.5", progressive: "1", exemplary: "2" },
           },
           {
             id: "hs-7",
-            name: "Women's satisfaction with mental health services (GNH-aligned wellbeing index)",
+            name: "Satisfaction with mental health services",
             type: "Participatory",
+            dataType: "index",
+            unit: "/10",
             description: "Service quality perception",
+            benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
           },
           {
             id: "hs-8",
-            name: "Integration of mental health support in GBV and disaster recovery services",
+            name: "Mental health integration in GBV recovery score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Integrated service delivery",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -492,21 +711,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "hs-9",
-            name: "% of public toilets in urban areas with women-specific, clean, and safe facilities",
+            name: "% of public toilets women-specific & safe",
             type: "Quantitative",
-            description: "Gender-responsive WASH infrastructure",
+            dataType: "percentage",
+            unit: "%",
+            description: "Gender-responsive WASH",
+            benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
           },
           {
             id: "hs-10",
-            name: "Proximity of safe water sources to women-headed households in peri-urban zones",
+            name: "% within 500m of safe water source",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Water access equity",
+            benchmark: { critical: "0", developing: "40", progressive: "70", exemplary: "95" },
           },
           {
             id: "hs-11",
-            name: "% of urban schools with gender-separated functional toilets",
+            name: "% of schools with gender-separated toilets",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Education facility WASH",
+            benchmark: { critical: "0", developing: "30", progressive: "60", exemplary: "90" },
           },
         ],
       },
@@ -516,8 +744,7 @@ export const DOMAINS: Domain[] = [
     id: "governance-voice",
     name: "Governance and Voice",
     shortName: "Governance",
-    description:
-      "Women's meaningful participation in urban planning, local governance, and decision-making processes.",
+    description: "Women's meaningful participation in urban planning, local governance, and decision-making processes.",
     icon: "users",
     color: "#06b6d4",
     subdomains: [
@@ -527,27 +754,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "gv-1",
-            name: "% of Thromde (municipal) council seats held by women",
+            name: "% of Thromde council seats held by women",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Political representation",
+            benchmark: { critical: "0", developing: "15", progressive: "30", exemplary: "40" },
           },
           {
             id: "gv-2",
-            name: "% of urban planning committees with at least 40% women membership",
+            name: "% of planning committees with 40%+ women",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Committee gender balance",
+            benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "60" },
           },
           {
             id: "gv-3",
-            name: "Number of women serving in senior roles in urban administration",
+            name: "% of senior urban admin roles held by women",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Administrative leadership",
+            benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "40" },
           },
           {
             id: "gv-4",
-            name: "Women's perception of being heard in local government processes",
+            name: "Women's perception of being heard in government",
             type: "Participatory",
-            description: "Voice and influence perception",
+            dataType: "index",
+            unit: "/10",
+            description: "Voice and influence",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "8" },
           },
         ],
       },
@@ -557,51 +796,72 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "gv-5",
-            name: "% of urban master plans developed with gender-disaggregated participatory consultations",
+            name: "% of master plans with gender consultations",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Inclusive planning process",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "gv-6",
-            name: "Women's participation rate in local area planning meetings",
+            name: "Women's participation in planning meetings (%)",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Civic participation",
+            benchmark: { critical: "0", developing: "15", progressive: "30", exemplary: "45" },
           },
           {
             id: "gv-7",
-            name: "Existence of gender-responsive budgeting in urban local body budgets",
+            name: "Gender-responsive budgeting score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Budget inclusiveness",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
           {
             id: "gv-8",
-            name: "% of urban infrastructure projects with women's safety audits conducted",
+            name: "% of projects with women's safety audits",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Safety-integrated planning",
+            benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
           },
         ],
       },
       {
         id: "data-monitoring",
-        name: "Data and Monitoring Systems",
+        name: "Data and Monitoring",
         indicators: [
           {
             id: "gv-9",
-            name: "% of urban indicators in national/local databases disaggregated by sex",
+            name: "% of urban indicators disaggregated by sex",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Data gender responsiveness",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "gv-10",
-            name: "Frequency of gender-disaggregated urban living conditions surveys",
+            name: "Gender surveys per year",
             type: "Quantitative",
+            dataType: "number",
+            unit: "per year",
             description: "Monitoring frequency",
+            benchmark: { critical: "0", developing: "1", progressive: "2", exemplary: "4" },
           },
           {
             id: "gv-11",
-            name: "Existence of a dedicated gender and urban data repository accessible to planners",
+            name: "Gender data repository availability score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Data infrastructure",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -611,8 +871,7 @@ export const DOMAINS: Domain[] = [
     id: "climate-resilience",
     name: "Climate Resilience",
     shortName: "Climate",
-    description:
-      "Women's agency in climate adaptation, disaster risk reduction, and sustainable resource management in Bhutan's fragile mountain ecosystem.",
+    description: "Women's agency in climate adaptation, disaster risk reduction, and sustainable resource management in Bhutan's fragile mountain ecosystem.",
     icon: "leaf",
     color: "#10b981",
     subdomains: [
@@ -622,27 +881,39 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "cr-1",
-            name: "% of women reached by early warning systems for GLOF, landslides, and earthquakes",
+            name: "% of women reached by early warning systems",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Early warning coverage",
+            benchmark: { critical: "0", developing: "20", progressive: "40", exemplary: "70" },
           },
           {
             id: "cr-2",
-            name: "% of women trained in first response and community disaster management teams",
+            name: "% of women trained in disaster management",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "DRR capacity building",
+            benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
           },
           {
             id: "cr-3",
-            name: "Gender disaggregated mortality and displacement in urban disaster events",
+            name: "Gender gap in disaster mortality ratio",
             type: "Quantitative",
-            description: "Disaster impact equity",
+            dataType: "ratio",
+            unit: "ratio",
+            description: "1=equal, >1=women more affected (lower is better)",
+            benchmark: { critical: "2", developing: "1.5", progressive: "1.2", exemplary: "1" },
           },
           {
             id: "cr-4",
-            name: "Women's leadership roles in community disaster management committees",
+            name: "Women's leadership in DRR committees score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "DRR governance participation",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -652,21 +923,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "cr-5",
-            name: "% of women beneficiaries of climate adaptation livelihood support programmes",
+            name: "% of women in climate adaptation programmes",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Adaptation program reach",
+            benchmark: { critical: "0", developing: "15", progressive: "35", exemplary: "60" },
           },
           {
             id: "cr-6",
-            name: "Women's knowledge and adoption of climate-resilient building practices",
+            name: "Adoption of climate-resilient practices score",
             type: "Participatory",
-            description: "Adoption of resilient practices",
+            dataType: "index",
+            unit: "/10",
+            description: "Knowledge and adoption",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "8" },
           },
           {
             id: "cr-7",
-            name: "Access to climate finance and green business opportunities for women entrepreneurs",
+            name: "Women's access to climate finance score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Green economy access",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -676,21 +956,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "cr-8",
-            name: "% of urban green spaces within 500m of residential areas designed with women's safety in mind",
+            name: "% of green spaces with women's safety design",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Gender-responsive green design",
+            benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "50" },
           },
           {
             id: "cr-9",
-            name: "Women's use of and satisfaction with public parks and natural spaces",
+            name: "Women's satisfaction with public parks",
             type: "Participatory",
+            dataType: "index",
+            unit: "/10",
             description: "Green space utilization",
+            benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
           },
           {
             id: "cr-10",
-            name: "Women's participation in urban community gardens, water management groups, or forest user groups",
+            name: "% of women in environmental groups",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Environmental participation",
+            benchmark: { critical: "0", developing: "10", progressive: "25", exemplary: "45" },
           },
         ],
       },
@@ -700,8 +989,7 @@ export const DOMAINS: Domain[] = [
     id: "culture-identity",
     name: "Culture and Identity",
     shortName: "Culture",
-    description:
-      "Integration of Bhutan's GNH values, Buddhist traditions, and indigenous knowledge with gender equity in urban life.",
+    description: "Integration of Bhutan's GNH values, Buddhist traditions, and indigenous knowledge with gender equity in urban life.",
     icon: "globe",
     color: "#a855f7",
     subdomains: [
@@ -711,21 +999,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ci-1",
-            name: "Women's subjective wellbeing scores (GNH survey) disaggregated by urban/peri-urban residence",
+            name: "GNH wellbeing score (women, urban)",
             type: "Quantitative",
+            dataType: "index",
+            unit: "/10",
             description: "GNH wellbeing metric",
+            benchmark: { critical: "0", developing: "4", progressive: "6", exemplary: "8" },
           },
           {
             id: "ci-2",
-            name: "% of urban cultural programmes that promote gender-equitable narratives",
+            name: "% of cultural programmes promoting gender equity",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Cultural programming equity",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "ci-3",
-            name: "Level of community acceptance of women in public leadership (attitudinal survey)",
+            name: "Community acceptance of women in leadership",
             type: "Participatory",
+            dataType: "index",
+            unit: "/10",
             description: "Social acceptance metric",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "8" },
           },
         ],
       },
@@ -735,21 +1032,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ci-4",
-            name: "Recognition and integration of women's traditional ecological knowledge in urban climate plans",
+            name: "Integration of women's ecological knowledge score",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Knowledge integration",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
           {
             id: "ci-5",
-            name: "% of urban heritage and cultural preservation initiatives that centre women's roles",
+            name: "% of heritage initiatives centring women's roles",
             type: "Qualitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Cultural preservation equity",
+            benchmark: { critical: "0", developing: "15", progressive: "40", exemplary: "70" },
           },
           {
             id: "ci-6",
-            name: "Representation of diverse ethnic women (Lhotshampa, Sharchop, Ngalop) in urban planning processes",
+            name: "Ethnic diversity in planning participation score",
             type: "Participatory",
-            description: "Ethnic diversity in participation",
+            dataType: "index",
+            unit: "/10",
+            description: "Diverse representation",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -759,21 +1065,30 @@ export const DOMAINS: Domain[] = [
         indicators: [
           {
             id: "ci-7",
-            name: "Change in gender attitude index scores among urban residents over time",
+            name: "Gender attitude index change (pts/yr)",
             type: "Quantitative",
-            description: "Attitudinal change metric",
+            dataType: "number",
+            unit: "pts",
+            description: "Attitudinal change (higher is better)",
+            benchmark: { critical: "0", developing: "1", progressive: "3", exemplary: "5" },
           },
           {
             id: "ci-8",
-            name: "% of urban schools incorporating gender equality in curricula",
+            name: "% of schools with gender equality curricula",
             type: "Quantitative",
+            dataType: "percentage",
+            unit: "%",
             description: "Education integration",
+            benchmark: { critical: "0", developing: "20", progressive: "50", exemplary: "80" },
           },
           {
             id: "ci-9",
-            name: "Media representation index for women in leadership in local urban broadcasting",
+            name: "Media representation index for women leaders",
             type: "Qualitative",
+            dataType: "index",
+            unit: "/10",
             description: "Media representation",
+            benchmark: { critical: "0", developing: "3", progressive: "6", exemplary: "9" },
           },
         ],
       },
@@ -781,48 +1096,21 @@ export const DOMAINS: Domain[] = [
   },
 ];
 
-export const SCORING_RUBRIC = {
-  quantitative: [
-    { range: [0, 25], label: "Critical", description: "Significant gap" },
-    { range: [26, 50], label: "Developing", description: "Below average" },
-    { range: [51, 75], label: "Progressive", description: "On track" },
-    { range: [76, 100], label: "Exemplary", description: "Best practice" },
-  ],
-  qualitative: [
-    { range: [0, 25], label: "Critical", description: "Non-existent" },
-    { range: [26, 50], label: "Developing", description: "Partially implemented" },
-    { range: [51, 75], label: "Progressive", description: "Substantially implemented" },
-    { range: [76, 100], label: "Exemplary", description: "Fully implemented with monitoring" },
-  ],
-  participatory: [
-    { range: [0, 25], label: "Critical", description: "Very dissatisfied" },
-    { range: [26, 50], label: "Developing", description: "Dissatisfied" },
-    { range: [51, 75], label: "Progressive", description: "Satisfied" },
-    { range: [76, 100], label: "Exemplary", description: "Very satisfied" },
-  ],
-};
+export const CITIES: { id: string; name: string }[] = [
+  { id: "thimphu", name: "Thimphu" },
+  { id: "phuntsholing", name: "Phuntsholing" },
+  { id: "gelephu", name: "Gelephu" },
+  { id: "paro", name: "Paro" },
+];
 
-export function getScoreLabel(score: number): string {
-  if (score <= 25) return "Critical";
-  if (score <= 50) return "Developing";
-  if (score <= 75) return "Progressive";
-  return "Exemplary";
-}
-
-export function getScoreColor(score: number): string {
-  if (score <= 25) return "#ef4444";
-  if (score <= 50) return "#f59e0b";
-  if (score <= 75) return "#3b82f6";
-  return "#10b981";
-}
-
-export function calculateDomainScore(domain: Domain, scores: Record<string, number>): number {
-  const allIndicators = domain.subdomains.flatMap((s) => s.indicators);
-  const indicatorScores = allIndicators.map((ind) => scores[ind.id] ?? 50);
-  return indicatorScores.reduce((a, b) => a + b, 0) / indicatorScores.length;
-}
-
-export function calculateOverallScore(scores: Record<string, number>): number {
-  const domainScores = DOMAINS.map((d) => calculateDomainScore(d, scores));
-  return domainScores.reduce((a, b) => a + b, 0) / domainScores.length;
+export function getAllIndicators(): (Indicator & { domainId: string; subdomainId: string })[] {
+  return DOMAINS.flatMap((d) =>
+    d.subdomains.flatMap((s) =>
+      s.indicators.map((i) => ({
+        ...i,
+        domainId: d.id,
+        subdomainId: s.id,
+      }))
+    )
+  );
 }

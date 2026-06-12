@@ -1,0 +1,191 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Indicator,
+  getStatus,
+  getStatusColor,
+  getStatusBg,
+} from "@/lib/grme-data";
+
+interface DataEntryFormProps {
+  indicator: Indicator;
+  value: number | string | null;
+  notes?: string;
+  onValueChange: (value: number | string, notes?: string) => void;
+}
+
+export default function DataEntryForm({
+  indicator,
+  value,
+  notes,
+  onValueChange,
+}: DataEntryFormProps) {
+  const [inputValue, setInputValue] = useState<string>(
+    value !== null && value !== undefined ? String(value) : ""
+  );
+  const [noteText, setNoteText] = useState(notes || "");
+  const [showBenchmark, setShowBenchmark] = useState(false);
+
+  const numericValue =
+    indicator.dataType === "text" || indicator.dataType === "boolean"
+      ? NaN
+      : parseFloat(inputValue);
+
+  const status =
+    !isNaN(numericValue)
+      ? getStatus(numericValue, indicator)
+      : null;
+
+  const color = status ? getStatusColor(status) : "#9ca3af";
+  const bg = status ? getStatusBg(status) : "#f9fafb";
+
+  const handleSubmit = () => {
+    if (indicator.dataType === "text" || indicator.dataType === "boolean") {
+      onValueChange(inputValue, noteText || undefined);
+    } else if (!isNaN(numericValue)) {
+      onValueChange(numericValue, noteText || undefined);
+    }
+  };
+
+  const isLowerBetter = indicator.name.toLowerCase().includes("gap") ||
+    indicator.name.toLowerCase().includes("mortality") ||
+    indicator.name.toLowerCase().includes("prevalence") ||
+    indicator.name.toLowerCase().includes("burden") ||
+    indicator.name.toLowerCase().includes("difficulty") ||
+    indicator.name.toLowerCase().includes("barriers") ||
+    indicator.name.toLowerCase().includes("cost") ||
+    indicator.name.toLowerCase().includes("overcrowding") ||
+    indicator.name.toLowerCase().includes("spending") ||
+    indicator.name.toLowerCase().includes("harassment") ||
+    indicator.name.toLowerCase().includes("response time") ||
+    indicator.name.toLowerCase().includes("travel time");
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+              style={{
+                backgroundColor:
+                  indicator.type === "Quantitative"
+                    ? "#dbeafe"
+                    : indicator.type === "Qualitative"
+                    ? "#fef3c7"
+                    : "#f3e8ff",
+                color:
+                  indicator.type === "Quantitative"
+                    ? "#1d4ed8"
+                    : indicator.type === "Qualitative"
+                    ? "#b45309"
+                    : "#7c3aed",
+              }}
+            >
+              {indicator.type}
+            </span>
+            {isLowerBetter && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                Lower is better
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-medium text-gray-800">{indicator.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{indicator.description}</p>
+        </div>
+        {status && (
+          <span
+            className="text-xs font-bold px-2 py-1 rounded-lg shrink-0"
+            style={{ backgroundColor: bg, color }}
+          >
+            {status}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              type={indicator.dataType === "text" ? "text" : "number"}
+              step={indicator.dataType === "percentage" ? "1" : "0.1"}
+              min={indicator.dataType === "percentage" ? "0" : undefined}
+              max={indicator.dataType === "percentage" ? "100" : undefined}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder={`Enter value (${indicator.unit})`}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              {indicator.unit}
+            </span>
+          </div>
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
+          >
+            Save
+          </button>
+        </div>
+
+        {indicator.dataType === "percentage" && (
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={inputValue || "0"}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, ${color} ${inputValue || "0"}%, #e5e7eb ${inputValue || "0"}%)`,
+            }}
+          />
+        )}
+
+        <div>
+          <button
+            onClick={() => setShowBenchmark(!showBenchmark)}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {showBenchmark ? "Hide" : "Show"} benchmark targets
+          </button>
+          {showBenchmark && (
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {(["critical", "developing", "progressive", "exemplary"] as const).map(
+                (level) => {
+                  const levelStatus = level.charAt(0).toUpperCase() + level.slice(1) as "Critical" | "Developing" | "Progressive" | "Exemplary";
+                  return (
+                    <div
+                      key={level}
+                      className={`text-center p-2 rounded-lg text-xs ${
+                        status === levelStatus ? "ring-2 ring-offset-1" : ""
+                      }`}
+                      style={{
+                        backgroundColor: getStatusBg(levelStatus),
+                        color: getStatusColor(levelStatus),
+                      }}
+                    >
+                      <div className="font-semibold capitalize">{level}</div>
+                      <div className="opacity-75">
+                        {indicator.benchmark[level]}{indicator.unit}
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
+        </div>
+
+        <textarea
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+          placeholder="Add notes or evidence..."
+          rows={2}
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+        />
+      </div>
+    </div>
+  );
+}
