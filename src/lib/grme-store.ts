@@ -10,7 +10,9 @@ import {
   AuditLog,
   calculateIndicatorScore,
   calculateDomainScore,
-  geometricMean,
+  getIndicatorConfidenceWeight,
+  adjustScoreForConfidence,
+  calculateWeightedOverallScore,
 } from "./grme-data";
 import * as api from "./grme-api";
 import { supabase } from "./supabase";
@@ -454,24 +456,101 @@ export function useGRMEData(
       );
       if (!indicator) return null;
       if (typeof data.value === "string") return null;
-      return calculateIndicatorScore(data.value, indicator);
+      return calculateIndicatorScore(data.value as number | boolean, indicator);
     },
     [assessment]
+  );
+
+  const getAssessmentStats = useCallback(
+    (assess: AssessmentYear | undefined): {
+      total: number;
+      filled: number;
+      missing: number;
+      percentage: number;
+      confidence: number;
+    } => {
+      const total = domainsRef.current.reduce(
+        (sum, d) =>
+          sum +
+          d.subdomains.reduce((s, sub) => s + sub.indicators.length, 0),
+        0
+      );
+
+      if (!assess) {
+        return { total, filled: 0, missing: total, percentage: 0, confidence: 0 };
+      }
+
+      let totalWeight = 0;
+      let filledWeight = 0;
+
+      for (const domain of domainsRef.current) {
+        for (const sub of domain.subdomains) {
+          for (const indicator of sub.indicators) {
+            const weight = getIndicatorConfidenceWeight(indicator) * (sub.weight ?? 1);
+            totalWeight += weight;
+            const data = assess.indicators[indicator.id];
+            if (data !== undefined && data.value !== null && data.value !== undefined) {
+              filledWeight += weight;
+            }
+          }
+        }
+      }
+
+      const filled = Object.keys(assess.indicators).length;
+      const confidence = totalWeight > 0 ? Math.round((filledWeight / totalWeight) * 100) : 0;
+      const missing = Math.max(total - filled, 0);
+
+      return {
+        total,
+        filled,
+        missing,
+        percentage: confidence,
+        confidence,
+      };
+    },
+    []
+  );
+
+  const getDomainStatsForAssessment = useCallback(
+    (domain: Domain, assess: AssessmentYear | undefined): { confidence: number } => {
+      if (!assess) return { confidence: 0 };
+      let totalWeight = 0;
+      let filledWeight = 0;
+      for (const sub of domain.subdomains) {
+        for (const indicator of sub.indicators) {
+          const weight = getIndicatorConfidenceWeight(indicator) * (sub.weight ?? 1);
+          totalWeight += weight;
+          const data = assess.indicators[indicator.id];
+          if (data !== undefined && data.value !== null && data.value !== undefined) {
+            filledWeight += weight;
+          }
+        }
+      }
+      return { confidence: totalWeight > 0 ? Math.round((filledWeight / totalWeight) * 100) : 0 };
+    },
+    []
   );
 
   const getDomainScore = useCallback(
     (domainId: string): number => {
       const domain = domainsRef.current.find((d) => d.id === domainId);
       if (!domain) return 50;
-      return calculateDomainScore(domain, getIndicatorScore);
+      const raw = calculateDomainScore(domain, getIndicatorScore);
+      const confidence = getDomainStatsForAssessment(domain, assessment).confidence;
+      return adjustScoreForConfidence(raw, confidence);
     },
-    [getIndicatorScore]
+    [assessment, getDomainStatsForAssessment, getIndicatorScore]
   );
 
   const getOverallScore = useCallback((): number => {
-    const scores = domainsRef.current.map((d) => getDomainScore(d.id));
-    return geometricMean(scores);
-  }, [getDomainScore]);
+    const raw = calculateWeightedOverallScore(domainsRef.current, (id) => {
+      const domain = domainsRef.current.find((d) => d.id === id);
+      if (!domain) return 50;
+      return calculateDomainScore(domain, getIndicatorScore);
+    });
+    const confidence = getAssessmentStats(assessment).confidence;
+    return adjustScoreForConfidence(raw, confidence);
+  }, [assessment, getAssessmentStats, getIndicatorScore]);
 
   const getDataEntryStats = useCallback((): {
     total: number;
@@ -496,7 +575,22 @@ export function useGRMEData(
       percentage: confidence,
       confidence,
     };
-  }, [assessment]);
+  }, [assessment, getAssessmentStats]);
+
+  const getDataEntryStatsForYear = useCallback(
+    (year: number): {
+      total: number;
+      filled: number;
+      missing: number;
+      percentage: number;
+      confidence: number;
+    } => {
+      const city = ensureCity(selectedCity);
+      const assess = city.assessments[year];
+      return getAssessmentStats(assess);
+    },
+    [ensureCity, getAssessmentStats, selectedCity]
+  );
 
   const getScoreForYear = useCallback(
     (year: number): number => {
@@ -514,15 +608,18 @@ export function useGRMEData(
         );
         if (!indicator) return null;
         if (typeof data.value === "string") return null;
-        return calculateIndicatorScore(data.value, indicator);
+        return calculateIndicatorScore(data.value as number | boolean, indicator);
       };
 
-      const domainScores = domainsRef.current.map((d) =>
-        calculateDomainScore(d, getScoreForIndicator)
-      );
-      return geometricMean(domainScores);
+      const raw = calculateWeightedOverallScore(domainsRef.current, (id) => {
+        const domain = domainsRef.current.find((d) => d.id === id);
+        if (!domain) return 50;
+        return calculateDomainScore(domain, getScoreForIndicator);
+      });
+      const confidence = getAssessmentStats(assess).confidence;
+      return adjustScoreForConfidence(raw, confidence);
     },
-    [ensureCity, selectedCity]
+    [ensureCity, getAssessmentStats, selectedCity]
   );
 
   const getDomainScoreForYear = useCallback(
@@ -544,12 +641,14 @@ export function useGRMEData(
         );
         if (!indicator) return null;
         if (typeof data.value === "string") return null;
-        return calculateIndicatorScore(data.value, indicator);
+        return calculateIndicatorScore(data.value as number | boolean, indicator);
       };
 
-      return calculateDomainScore(domain, getScoreForIndicator);
+      const raw = calculateDomainScore(domain, getScoreForIndicator);
+      const confidence = getDomainStatsForAssessment(domain, assess).confidence;
+      return adjustScoreForConfidence(raw, confidence);
     },
-    [ensureCity, selectedCity]
+    [ensureCity, getDomainStatsForAssessment, selectedCity]
   );
 
   return {
@@ -568,6 +667,7 @@ export function useGRMEData(
     getDomainScore,
     getOverallScore,
     getDataEntryStats,
+    getDataEntryStatsForYear,
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,

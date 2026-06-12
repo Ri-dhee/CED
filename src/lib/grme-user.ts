@@ -86,6 +86,50 @@ export function clearUser(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+async function loadSessionUser(): Promise<GrmeUser | null> {
+  try {
+    const res = await fetch("/api/grme/session", { credentials: "include" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.user || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveSessionUser(
+  name: string,
+  role: UserRole,
+  password?: string
+): Promise<{ success: boolean; error?: string; user?: GrmeUser }> {
+  try {
+    const res = await fetch("/api/grme/session", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, role, password }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: json.error || "Login failed" };
+    }
+    return { success: true, user: json.user };
+  } catch {
+    return { success: false, error: "Unable to contact session service" };
+  }
+}
+
+async function clearSessionUser(): Promise<void> {
+  try {
+    await fetch("/api/grme/session", {
+      method: "DELETE",
+      credentials: "include",
+    });
+  } catch {
+    // ignore
+  }
+}
+
 // ── Hook ────────────────────────────────────────────────────────
 
 export function useGrmeUser() {
@@ -93,21 +137,36 @@ export function useGrmeUser() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setUser(loadUser());
-    setLoaded(true);
+    let cancelled = false;
+
+    async function init() {
+      const sessionUser = await loadSessionUser();
+      if (cancelled) return;
+      if (sessionUser) {
+        setUser(sessionUser);
+        saveUser(sessionUser);
+      } else {
+        setUser(loadUser());
+      }
+      setLoaded(true);
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = useCallback((name: string, role: UserRole) => {
-    const u: GrmeUser = {
-      name: name.trim(),
-      role,
-      loginAt: new Date().toISOString(),
-    };
-    saveUser(u);
-    setUser(u);
+  const login = useCallback(async (name: string, role: UserRole, password?: string) => {
+    const result = await saveSessionUser(name.trim(), role, password);
+    if (!result.success || !result.user) return result;
+    saveUser(result.user);
+    setUser(result.user);
+    return result;
   }, []);
 
   const logout = useCallback(() => {
+    clearSessionUser().catch(() => {});
     clearUser();
     setUser(null);
   }, []);
@@ -118,6 +177,12 @@ export function useGrmeUser() {
       const updated = { ...user, role };
       saveUser(updated);
       setUser(updated);
+      fetch("/api/grme/session", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: updated.name, role }),
+      }).catch(() => {});
     },
     [user]
   );

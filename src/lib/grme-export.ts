@@ -2,7 +2,7 @@ import { Domain, CityData, AssessmentYear, calculateIndicatorScore } from "./grm
 
 // ── CSV Helpers ─────────────────────────────────────────────────
 
-function escapeCsv(value: string | number | null | undefined): string {
+function escapeCsv(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return "";
   const str = String(value);
   if (str.includes(",") || str.includes('"') || str.includes("\n")) {
@@ -177,7 +177,7 @@ export function exportSummaryCsv(
       const found = findIndicator(domains, indicatorId);
       if (!found) return null;
       if (typeof data.value === "string") return null;
-      return calculateIndicatorScore(data.value, found.indicator);
+      return calculateIndicatorScore(data.value as number | boolean, found.indicator);
     };
 
     const domainScores = domains.map((domain) => {

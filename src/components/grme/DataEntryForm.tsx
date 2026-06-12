@@ -12,7 +12,7 @@ import {
 
 interface DataEntryFormProps {
   indicator: Indicator;
-  value: number | string | null;
+  value: number | string | boolean | null;
   notes?: string;
   onValueChange: (value: number | string, notes?: string) => void;
 }
@@ -31,17 +31,33 @@ export default function DataEntryForm({
 
   // Sync local state when parent value changes (e.g., year switch)
   useEffect(() => {
-    setInputValue(value !== null && value !== undefined ? String(value) : "");
-  }, [value]);
+    if (indicator.dataType === "boolean") {
+      if (value === 1 || value === true || value === "true") {
+        setInputValue("true");
+      } else if (value === 0 || value === false || value === "false") {
+        setInputValue("false");
+      } else {
+        setInputValue("");
+      }
+    } else {
+      setInputValue(value !== null && value !== undefined ? String(value) : "");
+    }
+  }, [value, indicator.dataType]);
 
   useEffect(() => {
     setNoteText(notes || "");
   }, [notes]);
 
   const numericValue =
-    indicator.dataType === "text" || indicator.dataType === "boolean"
+    indicator.dataType === "text"
       ? NaN
-      : parseFloat(inputValue);
+      : indicator.dataType === "boolean"
+        ? inputValue === "true"
+          ? 1
+          : inputValue === "false"
+            ? 0
+            : NaN
+        : parseFloat(inputValue);
 
   const score = !isNaN(numericValue)
     ? calculateIndicatorScore(numericValue, indicator)
@@ -55,7 +71,12 @@ export default function DataEntryForm({
 
   const handleSubmit = () => {
     if (indicator.dataType === "text" || indicator.dataType === "boolean") {
-      onValueChange(inputValue, noteText || undefined);
+      if (indicator.dataType === "boolean") {
+        if (inputValue !== "true" && inputValue !== "false") return;
+        onValueChange(inputValue === "true" ? 1 : 0, noteText || undefined);
+      } else {
+        onValueChange(inputValue, noteText || undefined);
+      }
     } else if (!isNaN(numericValue)) {
       onValueChange(numericValue, noteText || undefined);
     }
@@ -114,19 +135,33 @@ export default function DataEntryForm({
       <div className="space-y-3">
         <div className="flex gap-2">
           <div className="flex-1 relative">
-            <input
-              type={indicator.dataType === "text" ? "text" : "number"}
-              step={indicator.dataType === "percentage" ? "1" : "0.1"}
-              min={indicator.dataType === "percentage" ? "0" : undefined}
-              max={indicator.dataType === "percentage" ? "100" : undefined}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={`Enter value (${indicator.unit})`}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-              {indicator.unit}
-            </span>
+            {indicator.dataType === "boolean" ? (
+              <select
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              >
+                <option value="">Select yes/no</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            ) : (
+              <input
+                type={indicator.dataType === "text" ? "text" : "number"}
+                step={indicator.dataType === "percentage" ? "1" : "0.1"}
+                min={indicator.dataType === "percentage" ? "0" : undefined}
+                max={indicator.dataType === "percentage" ? "100" : undefined}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={`Enter value (${indicator.unit})`}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              />
+            )}
+            {indicator.dataType !== "boolean" && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                {indicator.unit}
+              </span>
+            )}
           </div>
           <button
             onClick={handleSubmit}

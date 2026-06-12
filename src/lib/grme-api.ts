@@ -243,8 +243,14 @@ export async function healthCheck(): Promise<boolean> {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function parseValue(val: any): number | string {
+function parseValue(val: any): number | string | boolean {
   if (val === null || val === undefined || val === "") return val;
+  if (val === true || val === false) return val;
+  if (typeof val === "string") {
+    const normalized = val.trim().toLowerCase();
+    if (normalized === "true" || normalized === "yes") return true;
+    if (normalized === "false" || normalized === "no") return false;
+  }
   const num = Number(val);
   return isNaN(num) ? val : num;
 }

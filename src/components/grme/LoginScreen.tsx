@@ -6,17 +6,18 @@ import {
   ROLE_LABELS,
   ROLE_COLORS,
   ROLE_DESCRIPTIONS,
-  verifyAdminPassword,
-  isPasswordConfigured,
 } from "@/lib/grme-user";
 import {
   getActiveUsers,
-  verifyUserByName,
   ManagedUser,
 } from "@/lib/grme-managed-users";
 
 interface LoginScreenProps {
-  onLogin: (name: string, role: UserRole) => void;
+  onLogin: (
+    name: string,
+    role: UserRole,
+    password?: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 const ROLES: UserRole[] = ["admin", "editor", "viewer"];
@@ -51,22 +52,17 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
     // Admin login
     if (selectedRole === "admin") {
-      if (!isPasswordConfigured()) {
-        setError("Admin access is not configured. Contact your administrator.");
-        return;
-      }
       if (!adminPassword) {
         setError("Admin password is required");
         return;
       }
       setLoading(true);
-      const valid = await verifyAdminPassword(adminPassword);
+      const result = await onLogin(name.trim(), "admin", adminPassword);
       setLoading(false);
-      if (!valid) {
-        setError("Incorrect admin password");
+      if (!result.success) {
+        setError(result.error || "Incorrect admin password");
         return;
       }
-      onLogin(name.trim(), "admin");
       return;
     }
 
@@ -77,19 +73,23 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         return;
       }
       setLoading(true);
-      const verified = await verifyUserByName(name.trim(), userPassword);
+      const result = await onLogin(name.trim(), matchedManagedUser.role, userPassword);
       setLoading(false);
-      if (!verified) {
-        setError("Incorrect password");
+      if (!result.success) {
+        setError(result.error || "Incorrect password");
         return;
       }
-      onLogin(name.trim(), matchedManagedUser.role);
       return;
     }
 
     // Non-managed user (bootstrap mode — no managed users yet)
     if (managedUsers.length === 0) {
-      onLogin(name.trim(), selectedRole);
+      setLoading(true);
+      const result = await onLogin(name.trim(), selectedRole);
+      setLoading(false);
+      if (!result.success) {
+        setError(result.error || "Login failed");
+      }
       return;
     }
 

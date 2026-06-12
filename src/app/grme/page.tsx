@@ -87,6 +87,7 @@ function GRMEApp({
     getDomainScore,
     getOverallScore,
     getDataEntryStats,
+    getDataEntryStatsForYear,
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,
@@ -175,6 +176,18 @@ function GRMEApp({
 
   const overallScore = useMemo(() => getOverallScore(), [getOverallScore]);
   const stats = useMemo(() => getDataEntryStats(), [getDataEntryStats]);
+  const currentStats = stats;
+  const previousStats = useMemo(
+    () => (previousYear ? getDataEntryStatsForYear(previousYear) : null),
+    [getDataEntryStatsForYear, previousYear]
+  );
+  const lowConfidenceYears = useMemo(
+    () =>
+      availableYears.filter(
+        (year) => getDataEntryStatsForYear(year).confidence < 80
+      ),
+    [availableYears, getDataEntryStatsForYear]
+  );
   const overallStatus = getStatusFromScore(overallScore);
   const overallColor = getStatusColor(overallStatus);
 
@@ -380,16 +393,17 @@ function GRMEApp({
                   previousScore={
                     previousYear ? getScoreForYear(previousYear) : null
                   }
+                  confidence={currentStats.confidence}
                   size="xl"
                   showGrade
                   showTrend
                 />
                 <div className="mt-4 text-center">
                   <div className="text-xs font-medium text-gray-500">
-                    Confidence {stats.confidence}%
+                    Confidence {currentStats.confidence}%
                   </div>
                   <div className="text-[11px] text-gray-400 mt-1">
-                    Based on {stats.filled}/{stats.total} indicators
+                    Based on {currentStats.filled}/{currentStats.total} indicators
                   </div>
                 </div>
               </div>
@@ -438,6 +452,9 @@ function GRMEApp({
                 getDomainScoreForYear={getDomainScoreForYear}
                 selectedYear={selectedYear}
                 availableYears={availableYears}
+                confidence={currentStats.confidence}
+                filled={currentStats.filled}
+                total={currentStats.total}
               />
             </div>
 
@@ -475,6 +492,11 @@ function GRMEApp({
             {/* ═══ COMPARISON ROW (2+ years) ═══ */}
             {availableYears.length >= 2 && previousYear && (
               <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                {previousStats && (currentStats.confidence < 80 || previousStats.confidence < 80) && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    This comparison is preliminary because one or both years have incomplete data.
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                     Year-over-Year Comparison
@@ -504,6 +526,11 @@ function GRMEApp({
             {/* ═══ TREND CHARTS (2+ years) ═══ */}
             {availableYears.length >= 2 && (
               <div className="mt-6">
+                {lowConfidenceYears.length > 0 && (
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Trend charts include preliminary years: {lowConfidenceYears.join(", ")}.
+                  </div>
+                )}
                 <TrendChart
                   years={availableYears}
                   overallScores={Object.fromEntries(

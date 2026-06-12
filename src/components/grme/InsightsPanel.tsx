@@ -9,6 +9,9 @@ interface InsightsPanelProps {
   getDomainScoreForYear: (domainId: string, year: number) => number;
   selectedYear: number;
   availableYears: number[];
+  confidence: number;
+  filled: number;
+  total: number;
 }
 
 interface Insight {
@@ -27,6 +30,9 @@ export default function InsightsPanel({
   getDomainScoreForYear,
   selectedYear,
   availableYears,
+  confidence,
+  filled,
+  total,
 }: InsightsPanelProps) {
   const insights = useMemo(() => {
     const domainScores = domains.map((d) => ({
@@ -42,6 +48,16 @@ export default function InsightsPanel({
     const spread = Math.round(highest - lowest);
 
     const result: Insight[] = [];
+
+    if (confidence < 80) {
+      result.push({
+        icon: "⚠️",
+        label: "Data Status",
+        value: `Preliminary (${confidence}% confidence, ${filled}/${total} indicators)`,
+        color: confidence < 50 ? "#dc2626" : "#d97706",
+        bg: confidence < 50 ? "#fef2f2" : "#fffbeb",
+      });
+    }
 
     // Strongest domain
     if (strongest) {

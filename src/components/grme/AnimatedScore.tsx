@@ -6,6 +6,7 @@ import { ScoreStatus, getStatusFromScore, getStatusColor, getStatusBg } from "@/
 interface AnimatedScoreProps {
   score: number;
   previousScore?: number | null;
+  confidence?: number;
   label?: string;
   size?: "sm" | "md" | "lg" | "xl";
   showGrade?: boolean;
@@ -56,6 +57,7 @@ const SIZE_CONFIG = {
 export default function AnimatedScore({
   score,
   previousScore = null,
+  confidence = 100,
   label = "Overall Score",
   size = "xl",
   showGrade = true,
@@ -76,6 +78,7 @@ export default function AnimatedScore({
     previousScore !== null
       ? Math.round(score) - Math.round(previousScore)
       : null;
+  const isPreliminary = confidence < 80;
 
   return (
     <div className={`flex flex-col items-center ${className}`}>
@@ -103,7 +106,10 @@ export default function AnimatedScore({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`font-bold tabular-nums ${text}`} style={{ color }}>
+          <span
+            className={`font-bold tabular-nums ${text} ${isPreliminary ? "opacity-80" : ""}`}
+            style={{ color }}
+          >
             {animatedScore}
           </span>
           <span className={`${labelText} text-gray-400 font-medium`}>/ 100</span>
@@ -114,12 +120,17 @@ export default function AnimatedScore({
         <div className="mt-3 flex flex-col items-center gap-1">
           <span
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: bg, color }}
+            style={{
+              backgroundColor: isPreliminary ? "#fef3c7" : bg,
+              color: isPreliminary ? "#b45309" : color,
+            }}
           >
-            {status}
+            {isPreliminary ? "Preliminary" : status}
           </span>
           <span className="text-[11px] text-gray-500">
-            {STATUS_DESCRIPTIONS[status]}
+            {isPreliminary
+              ? `Confidence ${Math.round(confidence)}%`
+              : STATUS_DESCRIPTIONS[status]}
           </span>
         </div>
       )}

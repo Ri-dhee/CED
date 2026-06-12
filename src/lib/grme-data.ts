@@ -55,7 +55,7 @@ export interface Domain {
 
 export interface IndicatorData {
   indicatorId: string;
-  value: number | string | null;
+  value: number | string | boolean | null;
   evidence?: string;
   notes?: string;
   lastUpdated: string;
@@ -94,12 +94,21 @@ export interface AssessmentYear {
  *   - value <= exemplary → score 100
  *   - Linear interpolation between thresholds (inverted)
  */
-export function calculateIndicatorScore(value: number, indicator: Indicator): number {
+export function calculateIndicatorScore(
+  value: number | boolean,
+  indicator: Indicator
+): number {
   const b = indicator.benchmark;
   const critical = parseFloat(b.critical);
   const developing = parseFloat(b.developing);
   const progressive = parseFloat(b.progressive);
   const exemplary = parseFloat(b.exemplary);
+  const numericValue = typeof value === "boolean" ? (value ? 1 : 0) : value;
+
+  if (indicator.dataType === "boolean") {
+    const truthy = typeof numericValue === "number" ? numericValue > 0 : Boolean(numericValue);
+    return truthy ? 100 : 0;
+  }
 
   // Guard against NaN from bad benchmark data
   if (isNaN(critical) || isNaN(developing) || isNaN(progressive) || isNaN(exemplary)) {
@@ -113,32 +122,32 @@ export function calculateIndicatorScore(value: number, indicator: Indicator): nu
 
   if (indicator.direction === "higher") {
     // Higher value = better score
-    if (value <= critical) return 0;
-    if (value >= exemplary) return 100;
-    if (value < developing) {
+    if (numericValue <= critical) return 0;
+    if (numericValue >= exemplary) return 100;
+    if (numericValue < developing) {
       // Interpolate between 0-25
-      return ((value - critical) / (developing - critical)) * 25;
+      return ((numericValue - critical) / (developing - critical)) * 25;
     }
-    if (value < progressive) {
+    if (numericValue < progressive) {
       // Interpolate between 25-50
-      return 25 + ((value - developing) / (progressive - developing)) * 25;
+      return 25 + ((numericValue - developing) / (progressive - developing)) * 25;
     }
     // Interpolate between 50-75-100
-    return 50 + ((value - progressive) / (exemplary - progressive)) * 50;
+    return 50 + ((numericValue - progressive) / (exemplary - progressive)) * 50;
   } else {
     // Lower value = better score (inverted scale)
-    if (value >= critical) return 0;
-    if (value <= exemplary) return 100;
-    if (value > developing) {
+    if (numericValue >= critical) return 0;
+    if (numericValue <= exemplary) return 100;
+    if (numericValue > developing) {
       // Interpolate between 0-25 (value going down = score going up)
-      return ((critical - value) / (critical - developing)) * 25;
+      return ((critical - numericValue) / (critical - developing)) * 25;
     }
-    if (value > progressive) {
+    if (numericValue > progressive) {
       // Interpolate between 25-50
-      return 25 + ((developing - value) / (developing - progressive)) * 25;
+      return 25 + ((developing - numericValue) / (developing - progressive)) * 25;
     }
     // Interpolate between 50-100
-    return 50 + ((progressive - value) / (progressive - exemplary)) * 50;
+    return 50 + ((progressive - numericValue) / (progressive - exemplary)) * 50;
   }
 }
 
@@ -179,6 +188,29 @@ export function getStatusBg(status: ScoreStatus): string {
 }
 
 /**
+ * Reliability factor used for completeness/confidence.
+ * Quantitative inputs are the most reliable, participatory the least.
+ */
+export function getIndicatorReliabilityFactor(indicator: Indicator): number {
+  switch (indicator.type) {
+    case "Quantitative":
+      return 1;
+    case "Qualitative":
+      return 0.9;
+    case "Participatory":
+      return 0.8;
+  }
+}
+
+export function getIndicatorScoreWeight(indicator: Indicator): number {
+  return indicator.weight ?? 1;
+}
+
+export function getIndicatorConfidenceWeight(indicator: Indicator): number {
+  return getIndicatorScoreWeight(indicator) * getIndicatorReliabilityFactor(indicator);
+}
+
+/**
  * Geometric mean of an array of positive numbers.
  * Clamps each value to a minimum of 0.001 to avoid zero collapse.
  * Used instead of arithmetic mean to penalize domain imbalance —
@@ -190,6 +222,23 @@ export function geometricMean(values: number[]): number {
   return Math.exp(logSum / values.length);
 }
 
+export function weightedGeometricMean(values: number[], weights: number[]): number {
+  if (values.length === 0) return 0;
+  const safeWeights = weights.map((w) => Math.max(w, 0.001));
+  const totalWeight = safeWeights.reduce((a, b) => a + b, 0);
+  if (totalWeight <= 0) return geometricMean(values);
+  const logSum = values.reduce(
+    (sum, value, index) => sum + Math.log(Math.max(value, 0.001)) * safeWeights[index],
+    0
+  );
+  return Math.exp(logSum / totalWeight);
+}
+
+export function adjustScoreForConfidence(score: number, confidence: number): number {
+  const factor = 0.25 + (Math.max(0, Math.min(100, confidence)) / 100) * 0.75;
+  return Math.max(0, Math.min(100, score * factor));
+}
+
 /**
  * Calculate domain score using geometric mean of indicator scores.
  * This penalizes imbalance more than arithmetic averaging.
@@ -198,13 +247,20 @@ export function calculateDomainScore(
   domain: Domain,
   getIndicatorScore: (id: string) => number | null
 ): number {
-  const allIndicators = domain.subdomains.flatMap((s) => s.indicators);
-  const scores = allIndicators
-    .map((ind) => getIndicatorScore(ind.id))
-    .filter((s): s is number => s !== null);
+  const items = domain.subdomains.flatMap((sub) =>
+    sub.indicators.map((ind) => ({
+      score: getIndicatorScore(ind.id),
+      weight: getIndicatorScoreWeight(ind) * (sub.weight ?? 1),
+    }))
+  );
+
+  const scores = items.filter((item): item is { score: number; weight: number } => item.score !== null);
 
   if (scores.length === 0) return 50; // Default when no data entered
-  return geometricMean(scores);
+  return weightedGeometricMean(
+    scores.map((item) => item.score),
+    scores.map((item) => item.weight)
+  );
 }
 
 /**
@@ -215,6 +271,20 @@ export function calculateOverallScore(
 ): number {
   const scores = DEFAULT_DOMAINS.map((d) => getDomainScore(d.id));
   return geometricMean(scores);
+}
+
+export function calculateWeightedOverallScore(
+  domains: Domain[],
+  getDomainScore: (id: string) => number
+): number {
+  const items = domains.map((domain) => ({
+    score: getDomainScore(domain.id),
+    weight: domain.weight ?? 1,
+  }));
+  return weightedGeometricMean(
+    items.map((item) => item.score),
+    items.map((item) => item.weight)
+  );
 }
 
 /**

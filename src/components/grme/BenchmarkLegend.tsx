@@ -16,6 +16,9 @@ export default function BenchmarkLegend() {
       <p className="mb-3 text-[11px] leading-5 text-gray-500">
         Composite scores use geometric mean, so weak domains pull the result down more than a simple average.
       </p>
+      <p className="mb-3 text-[11px] leading-5 text-gray-500">
+        Scores below 80% data confidence are shown as preliminary.
+      </p>
       <div className="space-y-2">
         {THRESHOLDS.map((t) => {
           const color = getStatusColor(t.status);

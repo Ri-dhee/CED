@@ -7,6 +7,7 @@ import {
   getStatusFromScore,
   getStatusColor,
   getStatusBg,
+  getIndicatorConfidenceWeight,
 } from "@/lib/grme-data";
 
 interface DomainCardsProps {
@@ -42,6 +43,18 @@ export default function DomainCards({
       const color = getStatusColor(status);
       const bg = getStatusBg(status);
       const indicators = domain.subdomains.flatMap((s) => s.indicators);
+      let totalWeight = 0;
+      let filledWeight = 0;
+      for (const sub of domain.subdomains) {
+        for (const indicator of sub.indicators) {
+          const weight = getIndicatorConfidenceWeight(indicator) * (sub.weight ?? 1);
+          totalWeight += weight;
+          if (assessment.indicators[indicator.id]?.value !== undefined) {
+            filledWeight += weight;
+          }
+        }
+      }
+      const confidence = totalWeight > 0 ? Math.round((filledWeight / totalWeight) * 100) : 0;
 
       return {
         ...domain,
@@ -51,9 +64,10 @@ export default function DomainCards({
         color,
         bg,
         indicatorCount: indicators.length,
+        confidence,
       };
     });
-  }, [domains, getDomainScore, getDomainScoreForYear, previousYear]);
+  }, [domains, assessment, getDomainScore, getDomainScoreForYear, previousYear]);
 
   const sorted = [...data].sort((a, b) => b.score - a.score);
 
@@ -86,7 +100,7 @@ export default function DomainCards({
                 className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: domain.bg, color: domain.color }}
               >
-                {domain.status}
+                {domain.confidence < 80 ? "Preliminary" : domain.status}
               </span>
               {domain.trend !== null && domain.trend !== 0 && (
                 <span
@@ -146,6 +160,9 @@ export default function DomainCards({
                 <h4 className="text-sm font-bold text-gray-900 truncate">{domain.name}</h4>
                 <p className="text-[10px] text-gray-400">
                   {domain.indicatorCount} indicators
+                </p>
+                <p className="text-[10px] text-gray-400">
+                  Confidence {domain.confidence}%
                 </p>
               </div>
             </div>
