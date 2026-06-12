@@ -18,6 +18,11 @@ import {
 import RadarChart from "@/components/grme/RadarChart";
 import BarChart from "@/components/grme/BarChart";
 import ProgressRings from "@/components/grme/ProgressRings";
+import AnimatedScore from "@/components/grme/AnimatedScore";
+import DataQualityBar from "@/components/grme/DataQualityBar";
+import InsightsPanel from "@/components/grme/InsightsPanel";
+import DomainCards from "@/components/grme/DomainCards";
+import BenchmarkLegend from "@/components/grme/BenchmarkLegend";
 import ComparisonView from "@/components/grme/ComparisonView";
 import DataEntryForm from "@/components/grme/DataEntryForm";
 import AuditPanel from "@/components/grme/AuditPanel";
@@ -364,19 +369,35 @@ function GRMEApp({
       {activeTab === "dashboard" && (
         <section className="pb-12" role="tabpanel" id="panel-dashboard" aria-labelledby="tab-dashboard">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            {/* Top row: Radar + Progress Rings */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+            {/* ═══ HERO ROW: Animated Score + Radar + Data Quality ═══ */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+              {/* Animated Score — hero prominence */}
+              <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center">
+                <AnimatedScore
+                  score={overallScore}
+                  previousScore={
+                    previousYear ? getScoreForYear(previousYear) : null
+                  }
+                  size="xl"
+                  showGrade
+                  showTrend
+                />
+              </div>
+
+              {/* Radar Chart — core visual */}
+              <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-gray-900">
+                  <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                     Domain Profile
                   </h2>
                 </div>
-                <div className="max-w-md mx-auto">
+                <div className="max-w-sm mx-auto">
                   <RadarChart
                     domains={framework.domains}
                     getDomainScore={getDomainScore}
-                    size={400}
+                    size={340}
                     onDomainClick={(id) => {
                       if (canEdit) {
                         setSelectedDomain(id);
@@ -390,64 +411,47 @@ function GRMEApp({
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  Progress
-                </h2>
-                <ProgressRings
+              {/* Right column: Data Quality + Benchmark Legend */}
+              <div className="lg:col-span-4 space-y-6">
+                <DataQualityBar
                   domains={framework.domains}
                   getDomainScore={getDomainScore}
-                  onDomainClick={(id) => {
-                    if (canEdit && id !== "overall") {
-                      setSelectedDomain(id);
-                      setSelectedSubdomain(
-                        framework.domains.find((d) => d.id === id)?.subdomains[0]?.id || ""
-                      );
-                      setActiveTab("entry");
-                    }
-                  }}
+                  getDataEntryStats={getDataEntryStats}
                 />
+                <BenchmarkLegend />
               </div>
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center">
-                <div className="text-3xl font-bold gradient-text mb-1">
-                  {Math.round(overallScore)}
-                </div>
-                <div className="text-xs text-gray-500">Overall Score</div>
-              </div>
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center">
-                <div className="text-3xl font-bold text-primary mb-1">
-                  {stats.filled}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Indicators Entered
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center">
-                <div className="text-3xl font-bold text-amber-500 mb-1">
-                  {stats.total - stats.filled}
-                </div>
-                <div className="text-xs text-gray-500">Remaining</div>
-              </div>
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center">
-                <div className="text-3xl font-bold text-blue-500 mb-1">
-                  {stats.percentage}%
-                </div>
-                <div className="text-xs text-gray-500">Completion</div>
-              </div>
-            </div>
-
-            {/* Bar Chart */}
-            <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">
-                Domain Comparison
-              </h2>
-              <BarChart
+            {/* ═══ INSIGHTS ROW ═══ */}
+            <div className="mt-6">
+              <InsightsPanel
                 domains={framework.domains}
                 getDomainScore={getDomainScore}
+                getDomainScoreForYear={getDomainScoreForYear}
+                selectedYear={selectedYear}
+                availableYears={availableYears}
+              />
+            </div>
+
+            {/* ═══ DOMAIN CARDS ═══ */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                  Domains at a Glance
+                </h2>
+                {canEdit && (
+                  <span className="text-xs text-gray-400">
+                    Click a card to enter data
+                  </span>
+                )}
+              </div>
+              <DomainCards
+                domains={framework.domains}
+                assessment={assessment}
+                getDomainScore={getDomainScore}
+                getDomainScoreForYear={getDomainScoreForYear}
+                previousYear={previousYear}
+                selectedYear={selectedYear}
                 onDomainClick={(id) => {
                   if (canEdit) {
                     setSelectedDomain(id);
@@ -460,11 +464,11 @@ function GRMEApp({
               />
             </div>
 
-            {/* Comparison View (when 2+ years) */}
+            {/* ═══ COMPARISON ROW (2+ years) ═══ */}
             {availableYears.length >= 2 && previousYear && (
               <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-gray-900">
+                  <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                     Year-over-Year Comparison
                   </h2>
                   <div className="flex items-center gap-2 text-xs">
@@ -489,7 +493,7 @@ function GRMEApp({
               </div>
             )}
 
-            {/* Year-over-year trend (show when 2+ years exist) */}
+            {/* ═══ TREND CHARTS (2+ years) ═══ */}
             {availableYears.length >= 2 && (
               <div className="mt-6">
                 <TrendChart
