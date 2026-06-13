@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Domain, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
+import { Domain, getStatusFromScore } from "@/lib/grme-data";
 
 interface DataQualityBarProps {
   domains: Domain[];
@@ -25,7 +25,6 @@ export default function DataQualityBar({
   const domainCompletion = useMemo(() => {
     return domains.map((domain) => {
       const indicators = domain.subdomains.flatMap((s) => s.indicators);
-      const filled = indicators.length; // all indicators count
       const score = getDomainScore(domain.id);
       const status = getStatusFromScore(score);
       return {

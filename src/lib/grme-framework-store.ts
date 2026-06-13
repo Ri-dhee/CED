@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Domain,
   SubDomain,
@@ -28,12 +28,7 @@ export function useGRMEFramework() {
   const [proposals, setProposals] = useState<FrameworkProposal[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  const isRemoteNewer = useCallback(
-    (remote: { lastUpdated: string }, local: { lastUpdated: string }) => {
-      return (remote.lastUpdated || "") >= (local.lastUpdated || "");
-    },
-    []
-  );
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshFramework = useCallback(async () => {
     if (!hasSupabaseConfig) {
@@ -46,7 +41,7 @@ export function useGRMEFramework() {
       const apiFw = await loadFrameworkFromApi();
       if (apiFw) {
         const localFw = loadFramework();
-        const chosen = isRemoteNewer(apiFw, localFw) ? apiFw : localFw;
+        const chosen = (apiFw.lastUpdated || "") >= (localFw.lastUpdated || "") ? apiFw : localFw;
         setDomains(chosen.domains);
         setProposals(chosen.proposals);
         cacheFramework(chosen);
@@ -54,7 +49,20 @@ export function useGRMEFramework() {
     } catch {
       // Keep current state
     }
-  }, [isRemoteNewer]);
+  }, []);
+
+  const debouncedRefreshFramework = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshFramework();
+    }, 300);
+  }, [refreshFramework]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +80,7 @@ export function useGRMEFramework() {
       const apiFw = await loadFrameworkFromApi();
       if (!cancelled) {
         const localFw = loadFramework();
-        const chosen = apiFw && isRemoteNewer(apiFw, localFw) ? apiFw : localFw;
+        const chosen = apiFw && (apiFw.lastUpdated || "") >= (localFw.lastUpdated || "") ? apiFw : localFw;
         setDomains(chosen.domains);
         setProposals(chosen.proposals);
         cacheFramework(chosen);
@@ -93,7 +101,7 @@ export function useGRMEFramework() {
         "postgres_changes",
         { event: "*", schema: "public", table: "framework" },
         () => {
-          refreshFramework();
+          debouncedRefreshFramework();
         }
       )
       .subscribe();
@@ -101,14 +109,14 @@ export function useGRMEFramework() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [refreshFramework]);
+  }, [debouncedRefreshFramework]);
 
   // Refresh on window focus
   useEffect(() => {
-    const handleFocus = () => refreshFramework();
+    const handleFocus = () => debouncedRefreshFramework();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [refreshFramework]);
+  }, [debouncedRefreshFramework]);
 
   const persist = useCallback(
     (newDomains: Domain[], newProposals: FrameworkProposal[]) => {
@@ -591,7 +599,6 @@ export function useGRMEFramework() {
   // ── Reset to Defaults ──────────────────────────────────────
 
   const resetFramework = useCallback(() => {
-    const fw = loadFramework();
     // Force reload from defaults
     localStorage.removeItem("grme-framework");
     const fresh = loadFramework();

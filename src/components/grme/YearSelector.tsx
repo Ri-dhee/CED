@@ -15,7 +15,6 @@ export default function YearSelector({
   availableYears,
   onYearChange,
   onCreateYear,
-  onDeleteYear,
 }: YearSelectorProps) {
   const [showNewYear, setShowNewYear] = useState(false);
   const [newYearValue, setNewYearValue] = useState(

@@ -3,8 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Domain,
-  SubDomain,
-  Indicator,
   IndicatorType,
   DataType,
   Direction,
@@ -37,8 +35,6 @@ interface SpreadsheetEditorProps {
     indId: string
   ) => void;
 }
-
-type CollapsedState = "expanded" | "collapsed";
 
 function EditableCell({
   value,
@@ -349,10 +345,6 @@ export default function SpreadsheetEditor({
           <tbody>
             {domains.map((domain) => {
               const isDomainCollapsed = collapsedDomains.has(domain.id);
-              const domainIndicators = domain.subdomains.flatMap(
-                (s) => s.indicators
-              );
-
               return (
                 <>
                   {/* Domain Row */}

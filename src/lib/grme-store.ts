@@ -15,41 +15,88 @@ import {
   getIndicatorConfidenceWeight,
   adjustScoreForConfidence,
   calculateWeightedOverallScore,
+  SCORING_ENGINE_VERSION,
+  computeBenchmarkSnapshotId,
 } from "./grme-data";
 import * as api from "./grme-api";
 import { supabase, hasSupabaseConfig } from "./supabase";
 
 const STORAGE_KEY = "grme-data";
+const MIGRATION_SENTINEL_KEY = "grme-migration-v1";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+// ── Backfill scoring metadata on legacy years ──────────────────
+
+function backfillScoringMetadata(
+  data: Record<string, CityData>,
+  domains: Domain[]
+): Record<string, CityData> {
+  if (typeof window !== "undefined" && localStorage.getItem(MIGRATION_SENTINEL_KEY)) {
+    return data;
+  }
+
+  let changed = false;
+  const snapshotId = computeBenchmarkSnapshotId(domains);
+  const next: Record<string, CityData> = {};
+
+  for (const [cityId, city] of Object.entries(data)) {
+    const nextAssessments: Record<number, AssessmentYear> = {};
+    for (const [yearKey, assess] of Object.entries(city.assessments)) {
+      if (assess.scoringMetadata) {
+        nextAssessments[Number(yearKey)] = assess;
+        continue;
+      }
+      changed = true;
+      nextAssessments[Number(yearKey)] = {
+        ...assess,
+        scoringMetadata: {
+          engineVersion: SCORING_ENGINE_VERSION,
+          benchmarkSnapshotId: snapshotId,
+          calculatedAt: new Date().toISOString(),
+        },
+      };
+    }
+    next[cityId] = { ...city, assessments: nextAssessments };
+  }
+
+  if (changed && typeof window !== "undefined") {
+    localStorage.setItem(MIGRATION_SENTINEL_KEY, "done");
+  }
+
+  return changed ? next : data;
+}
+
 // ── Migration from old format ──────────────────────────────────
 
-function migrateOldFormat(
-  raw: Record<string, any>
-): Record<string, CityData> {
+function migrateOldFormat(raw: Record<string, unknown>): Record<string, CityData> {
   const result: Record<string, CityData> = {};
   const currentYear = new Date().getFullYear();
 
-  for (const [cityId, oldData] of Object.entries(raw)) {
-    if (oldData.indicators && !oldData.assessments) {
+  for (const [cityId, value] of Object.entries(raw)) {
+    const oldData = value as Record<string, unknown>;
+
+    if (isRecord(oldData.indicators) && !isRecord(oldData.assessments)) {
       result[cityId] = {
-        cityId: oldData.cityId || cityId,
-        cityName: oldData.cityName || cityId,
+        cityId: typeof oldData.cityId === "string" ? oldData.cityId : cityId,
+        cityName: typeof oldData.cityName === "string" ? oldData.cityName : cityId,
         assessments: {
-          [oldData.year || currentYear]: {
-            year: oldData.year || currentYear,
-            indicators: oldData.indicators || {},
-            auditLog: oldData.auditLog || [],
-            createdAt: oldData.lastUpdated || new Date().toISOString(),
+          [typeof oldData.year === "number" ? oldData.year : currentYear]: {
+            year: typeof oldData.year === "number" ? oldData.year : currentYear,
+            indicators: oldData.indicators as Record<string, IndicatorData>,
+            auditLog: Array.isArray(oldData.auditLog) ? (oldData.auditLog as AuditLog[]) : [],
+            createdAt: typeof oldData.lastUpdated === "string" ? oldData.lastUpdated : new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
         },
       };
-    } else if (oldData.assessments) {
-      result[cityId] = oldData;
+    } else if (isRecord(oldData.assessments)) {
+      const sanitized = sanitizeCityData(oldData, cityId);
+      if (sanitized) {
+        result[cityId] = sanitized;
+      }
     } else {
       result[cityId] = {
         cityId,
@@ -99,18 +146,19 @@ function sanitizeCityData(value: unknown, cityId: string): CityData | null {
 
 function loadAllData(): Record<string, CityData> {
   if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    const firstKey = Object.keys(parsed)[0];
-    if (firstKey && parsed[firstKey] && !parsed[firstKey].assessments) {
-      const migrated = migrateOldFormat(parsed);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-      return migrated;
-    }
-    if (!isRecord(parsed)) return {};
-    const sanitized: Record<string, CityData> = {};
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      const parsed: unknown = JSON.parse(raw);
+      if (!isRecord(parsed)) return {};
+      const firstKey = Object.keys(parsed)[0];
+      const firstEntry = firstKey ? parsed[firstKey] : undefined;
+      if (firstKey && isRecord(firstEntry) && !isRecord(firstEntry.assessments)) {
+        const migrated = migrateOldFormat(parsed);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
+      }
+      const sanitized: Record<string, CityData> = {};
     for (const [cityId, cityValue] of Object.entries(parsed)) {
       const city = sanitizeCityData(cityValue, cityId);
       if (city) sanitized[cityId] = city;
@@ -218,19 +266,27 @@ export function useGRMEData(
   userName?: string,
   selectedYear?: number
 ) {
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
   const [apiAvailable, setApiAvailable] = useState<boolean>(false);
   const domainsRef = useRef(domains);
-  domainsRef.current = domains;
   const currentUser = userName || "Stakeholder";
   const currentYear = selectedYear || new Date().getFullYear();
 
-  // ── Refresh data from Supabase ───────────────────────────────
+  useEffect(() => {
+    domainsRef.current = domains;
+  }, [domains]);
+
+  // ── Debounced refresh data from Supabase ───────────────────────
+  // Prevents cascading refreshes when multiple mutations fire rapidly.
 
   const refreshData = useCallback(async () => {
     if (!hasSupabaseConfig) {
-      setAllData(loadAllData());
+      const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
+      saveAllData(localData);
+      setAllData(localData);
       setApiAvailable(false);
       return;
     }
@@ -238,13 +294,27 @@ export function useGRMEData(
       const apiData = await api.loadAssessments();
       const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
       const localData = loadAllData();
-      const merged = mergeDataSources(reconciled, localData);
+      const merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
       setAllData(merged);
       saveAllData(merged);
       setApiAvailable(true);
     } catch {
       setApiAvailable(false);
     }
+  }, []);
+
+  const debouncedRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshData();
+    }, 300);
+  }, [refreshData]);
+
+  // Clear debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
   }, []);
 
   // Load on mount
@@ -254,7 +324,9 @@ export function useGRMEData(
     async function init() {
       if (!hasSupabaseConfig) {
         if (!cancelled) {
-          setAllData(loadAllData());
+          const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
+          saveAllData(localData);
+          setAllData(localData);
           setApiAvailable(false);
         }
         return;
@@ -264,14 +336,16 @@ export function useGRMEData(
         if (!cancelled) {
           const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
           const localData = loadAllData();
-          const merged = mergeDataSources(reconciled, localData);
+          const merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
           setAllData(merged);
           saveAllData(merged);
           setApiAvailable(true);
         }
       } catch {
         if (!cancelled) {
-          setAllData(loadAllData());
+          const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
+          saveAllData(localData);
+          setAllData(localData);
           setApiAvailable(false);
         }
       }
@@ -298,7 +372,7 @@ export function useGRMEData(
         "postgres_changes",
         { event: "*", schema: "public", table: "assessment_data" },
         () => {
-          refreshData();
+          debouncedRefresh();
         }
       )
       .subscribe();
@@ -306,14 +380,14 @@ export function useGRMEData(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [refreshData]);
+  }, [debouncedRefresh]);
 
   // Refresh when window gets focus (catches any missed changes)
   useEffect(() => {
-    const handleFocus = () => refreshData();
+    const handleFocus = () => debouncedRefresh();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [refreshData]);
+  }, [debouncedRefresh]);
 
   const ensureCity = useCallback(
     (cityId: string): CityData => {
@@ -354,6 +428,11 @@ export function useGRMEData(
         auditLog,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        scoringMetadata: {
+          engineVersion: SCORING_ENGINE_VERSION,
+          benchmarkSnapshotId: computeBenchmarkSnapshotId(domainsRef.current),
+          calculatedAt: new Date().toISOString(),
+        },
       };
 
       const updatedCity: CityData = {
@@ -466,6 +545,11 @@ export function useGRMEData(
         },
         auditLog: newAuditLog,
         updatedAt: new Date().toISOString(),
+        scoringMetadata: assess.scoringMetadata || {
+          engineVersion: SCORING_ENGINE_VERSION,
+          benchmarkSnapshotId: computeBenchmarkSnapshotId(domainsRef.current),
+          calculatedAt: new Date().toISOString(),
+        },
       };
 
       const updatedCity: CityData = {
@@ -531,6 +615,11 @@ export function useGRMEData(
         ...assess,
         auditLog: newAuditLog,
         updatedAt: new Date().toISOString(),
+        scoringMetadata: assess.scoringMetadata || {
+          engineVersion: SCORING_ENGINE_VERSION,
+          benchmarkSnapshotId: computeBenchmarkSnapshotId(domainsRef.current),
+          calculatedAt: new Date().toISOString(),
+        },
       };
 
       const updatedCity: CityData = {
@@ -701,7 +790,7 @@ export function useGRMEData(
       percentage: confidence,
       confidence,
     };
-  }, [assessment, getAssessmentStats]);
+  }, [assessment]);
 
   const getDataEntryStatsForYear = useCallback(
     (year: number): {
@@ -789,12 +878,13 @@ export function useGRMEData(
     addAuditNote,
     getIndicatorScore,
     getDomainScore,
+    getDomainStatsForAssessment,
     getOverallScore,
     getDataEntryStats,
     getDataEntryStatsForYear,
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,
-    refreshData,
+    refreshData: debouncedRefresh,
   };
 }

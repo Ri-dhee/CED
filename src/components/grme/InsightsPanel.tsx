@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { Domain, getStatusFromScore, getStatusColor, getStatusBg, ScoreStatus } from "@/lib/grme-data";
+import { Domain, getStatusFromScore, getStatusColor, getStatusBg, ScoreStatus, isConfidenceReliable } from "@/lib/grme-data";
 
 interface InsightsPanelProps {
   domains: Domain[];
   getDomainScore: (domainId: string) => number;
+  getDomainConfidence?: (domainId: string) => number;
   getDomainScoreForYear: (domainId: string, year: number) => number;
   selectedYear: number;
   availableYears: number[];
@@ -27,6 +28,7 @@ const STATUS_ORDER: ScoreStatus[] = ["Critical", "Developing", "Progressive", "E
 export default function InsightsPanel({
   domains,
   getDomainScore,
+  getDomainConfidence,
   getDomainScoreForYear,
   selectedYear,
   availableYears,
@@ -38,14 +40,25 @@ export default function InsightsPanel({
     const domainScores = domains.map((d) => ({
       domain: d,
       score: getDomainScore(d.id),
+      confidence: getDomainConfidence?.(d.id) ?? 100,
     }));
 
+    // Only consider reliable domains for ranking insights
+    const reliable = domainScores.filter((ds) =>
+      isConfidenceReliable(ds.confidence)
+    );
+
     const sorted = [...domainScores].sort((a, b) => b.score - a.score);
-    const strongest = sorted[0];
-    const weakest = sorted[sorted.length - 1];
-    const highest = sorted[0]?.score ?? 0;
-    const lowest = sorted[sorted.length - 1]?.score ?? 0;
-    const spread = Math.round(highest - lowest);
+    const reliableSorted = [...reliable].sort((a, b) => b.score - a.score);
+    const strongest = reliableSorted[0] || sorted[0];
+    const weakest = sorted.filter(
+      (ds) =>
+        isConfidenceReliable(ds.confidence) && ds.domain.id !== strongest?.domain.id
+    ).pop() || sorted[sorted.length - 1];
+
+    const allHighest = sorted[0]?.score ?? 0;
+    const allLowest = sorted[sorted.length - 1]?.score ?? 0;
+    const spread = Math.round(allHighest - allLowest);
 
     const result: Insight[] = [];
 
@@ -59,40 +72,45 @@ export default function InsightsPanel({
       });
     }
 
-    // Strongest domain
+    // Strongest domain (from reliable set only)
     if (strongest) {
       const status = getStatusFromScore(strongest.score);
+      const preliminaryNote =
+        !isConfidenceReliable(strongest.confidence) ? ` (${strongest.confidence}% conf)` : "";
       result.push({
         icon: "🏆",
         label: "Strongest Domain",
-        value: `${strongest.domain.shortName} (${Math.round(strongest.score)})`,
+        value: `${strongest.domain.shortName} (${Math.round(strongest.score)})${preliminaryNote}`,
         color: getStatusColor(status),
         bg: getStatusBg(status),
       });
     }
 
-    // Weakest domain
-    if (weakest && weakest !== strongest) {
+    // Weakest domain (exclude dom with insufficient confidence)
+    if (weakest && weakest.domain.id !== strongest?.domain.id) {
       const status = getStatusFromScore(weakest.score);
+      const preliminaryNote =
+        !isConfidenceReliable(weakest.confidence) ? ` (${weakest.confidence}% conf)` : "";
       result.push({
         icon: "🎯",
         label: "Needs Attention",
-        value: `${weakest.domain.shortName} (${Math.round(weakest.score)})`,
+        value: `${weakest.domain.shortName} (${Math.round(weakest.score)})${preliminaryNote}`,
         color: getStatusColor(status),
         bg: getStatusBg(status),
       });
     }
 
-    // Year-over-year changes
+    // Year-over-year changes (prefer reliable domains for highlights)
     const previousYear = availableYears
       .filter((y) => y < selectedYear)
       .sort((a, b) => b - a)[0];
 
     if (previousYear) {
-      const changes = domains.map((d) => ({
-        domain: d,
-        current: getDomainScore(d.id),
-        previous: getDomainScoreForYear(d.id, previousYear),
+      const changes = domainScores.map((ds) => ({
+        domain: ds.domain,
+        current: ds.score,
+        previous: getDomainScoreForYear(ds.domain.id, previousYear),
+        confidence: ds.confidence,
       }));
 
       const improved = changes
@@ -103,25 +121,37 @@ export default function InsightsPanel({
         .filter((c) => c.current < c.previous)
         .sort((a, b) => (a.current - a.previous) - (b.current - b.previous));
 
-      if (improved.length > 0) {
-        const top = improved[0];
-        const diff = Math.round(top.current - top.previous);
+      // Prefer reliable domains for Most Improved
+      const topImproved = improved.find((c) =>
+        isConfidenceReliable(c.confidence)
+      ) || improved[0];
+      if (topImproved) {
+        const diff = Math.round(topImproved.current - topImproved.previous);
+        const flag = !isConfidenceReliable(topImproved.confidence)
+          ? ` (${topImproved.confidence}% conf)`
+          : "";
         result.push({
           icon: "📈",
           label: "Most Improved",
-          value: `${top.domain.shortName} (+${diff})`,
+          value: `${topImproved.domain.shortName} (+${diff})${flag}`,
           color: "#059669",
           bg: "#ecfdf5",
         });
       }
 
-      if (declined.length > 0) {
-        const top = declined[0];
-        const diff = Math.round(top.current - top.previous);
+      // Prefer reliable domains for Biggest Decline
+      const topDeclined = declined.find((c) =>
+        isConfidenceReliable(c.confidence)
+      ) || declined[0];
+      if (topDeclined) {
+        const diff = Math.round(topDeclined.current - topDeclined.previous);
+        const flag = !isConfidenceReliable(topDeclined.confidence)
+          ? ` (${topDeclined.confidence}% conf)`
+          : "";
         result.push({
           icon: "📉",
           label: "Biggest Decline",
-          value: `${top.domain.shortName} (${diff})`,
+          value: `${topDeclined.domain.shortName} (${diff})${flag}`,
           color: "#dc2626",
           bg: "#fef2f2",
         });
@@ -169,7 +199,7 @@ export default function InsightsPanel({
     }
 
     return result;
-  }, [domains, getDomainScore, getDomainScoreForYear, selectedYear, availableYears]);
+  }, [domains, getDomainScore, getDomainConfidence, getDomainScoreForYear, selectedYear, availableYears, confidence, filled, total]);
 
   if (insights.length === 0) return null;
 

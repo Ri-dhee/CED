@@ -26,7 +26,6 @@ export default function DomainCards({
   getDomainScore,
   getDomainScoreForYear,
   previousYear = null,
-  selectedYear,
   onDomainClick,
 }: DomainCardsProps) {
   const [hovered, setHovered] = useState<string | null>(null);

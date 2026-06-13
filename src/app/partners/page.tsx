@@ -91,14 +91,6 @@ const categoryIcons: Record<string, React.ReactNode> = {
   ),
 };
 
-const categoryAriaLabels: Record<string, string> = {
-  "International Organization": "Globe icon representing international organizations",
-  NGO: "People icon representing non-governmental organizations",
-  Government: "Building icon representing government institutions",
-  "Financial Institution": "Bank icon representing financial institutions",
-  "Research Organization": "Flask icon representing research organizations",
-};
-
 export default function Partners() {
   return (
     <div>

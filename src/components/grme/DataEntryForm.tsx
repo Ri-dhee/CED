@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Indicator,
   calculateIndicatorScore,
@@ -23,30 +23,11 @@ export default function DataEntryForm({
   notes,
   onValueChange,
 }: DataEntryFormProps) {
-  const [inputValue, setInputValue] = useState<string>(
+  const [inputValue, setInputValue] = useState<string>(() =>
     value !== null && value !== undefined ? String(value) : ""
   );
-  const [noteText, setNoteText] = useState(notes || "");
+  const [noteText, setNoteText] = useState(() => notes || "");
   const [showBenchmark, setShowBenchmark] = useState(false);
-
-  // Sync local state when parent value changes (e.g., year switch)
-  useEffect(() => {
-    if (indicator.dataType === "boolean") {
-      if (value === 1 || value === true || value === "true") {
-        setInputValue("true");
-      } else if (value === 0 || value === false || value === "false") {
-        setInputValue("false");
-      } else {
-        setInputValue("");
-      }
-    } else {
-      setInputValue(value !== null && value !== undefined ? String(value) : "");
-    }
-  }, [value, indicator.dataType]);
-
-  useEffect(() => {
-    setNoteText(notes || "");
-  }, [notes]);
 
   const numericValue =
     indicator.dataType === "text"

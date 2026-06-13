@@ -29,8 +29,6 @@ export default function ProgressRings({
 
   const ringSize = 80;
   const strokeWidth = 6;
-  const radius = (ringSize - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
 
   const renderRing = (
     score: number,

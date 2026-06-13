@@ -1,7 +1,6 @@
 import {
   Domain,
   CityData,
-  AssessmentYear,
   calculateIndicatorScore,
   calculateDomainScore,
   calculateWeightedOverallScore,

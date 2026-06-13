@@ -1,6 +1,6 @@
 "use client";
 
-import { ScoreStatus, getStatusColor, getStatusBg } from "@/lib/grme-data";
+import { ScoreStatus, getStatusColor } from "@/lib/grme-data";
 
 const THRESHOLDS: { range: string; status: ScoreStatus; description: string }[] = [
   { range: "75 – 100", status: "Exemplary", description: "Leading practice" },
@@ -22,7 +22,6 @@ export default function BenchmarkLegend() {
       <div className="space-y-2">
         {THRESHOLDS.map((t) => {
           const color = getStatusColor(t.status);
-          const bg = getStatusBg(t.status);
           return (
             <div key={t.status} className="flex items-center gap-3">
               <div

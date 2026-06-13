@@ -21,6 +21,7 @@ interface TrendChartProps {
   domainScores: Record<number, Record<string, number>>;
   domainLabels: Record<string, string>;
   domainColors: Record<string, string>;
+  comparabilityWarning?: string | null;
 }
 
 // ── Custom Tooltip ──────────────────────────────────────────────
@@ -510,6 +511,7 @@ export default function TrendChart({
   domainScores,
   domainLabels,
   domainColors,
+  comparabilityWarning,
 }: TrendChartProps) {
   const [activeView, setActiveView] = useState<"overview" | "domains" | "heatmap">("overview");
 
@@ -584,6 +586,11 @@ export default function TrendChart({
                 ↓ {worst.label} ({Math.round(worst.diff)})
               </span>
             )}
+          </div>
+        )}
+        {comparabilityWarning && (
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            {comparabilityWarning}
           </div>
         )}
       </div>

@@ -8,10 +8,8 @@
 import { supabase } from "./supabase";
 import {
   CityData,
-  AssessmentYear,
   IndicatorData,
   AuditEntry,
-  AuditLog,
 } from "./grme-data";
 import { FrameworkStorage } from "./grme-framework";
 import { ManagedUser } from "./grme-managed-users";
@@ -130,7 +128,7 @@ export async function deleteYear(
 
 // ── Audit Log ────────────────────────────────────────────────────
 
-export async function loadAuditLog(): Promise<any[]> {
+export async function loadAuditLog(): Promise<Record<string, unknown>[]> {
   const { data, error } = await supabase
     .from("audit_log")
     .select("*")
@@ -243,8 +241,8 @@ export async function healthCheck(): Promise<boolean> {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function parseValue(val: any): number | string | boolean {
-  if (val === null || val === undefined || val === "") return val;
+function parseValue(val: unknown): number | string | boolean | null {
+  if (val === null || val === undefined || val === "") return null;
   if (val === true || val === false) return val;
   if (typeof val === "string") {
     const normalized = val.trim().toLowerCase();
@@ -252,7 +250,7 @@ function parseValue(val: any): number | string | boolean {
     if (normalized === "false" || normalized === "no") return false;
   }
   const num = Number(val);
-  return isNaN(num) ? val : num;
+  return Number.isNaN(num) ? String(val) : num;
 }
 
 function getCityName(cityId: string): string {

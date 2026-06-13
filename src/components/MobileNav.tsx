@@ -31,10 +31,6 @@ export default function MobileNav() {
   }, []);
 
   useEffect(() => {
-    closeNav();
-  }, [pathname, closeNav]);
-
-  useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
@@ -126,6 +122,7 @@ export default function MobileNav() {
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={closeNav}
                         className={`text-xl font-medium px-8 py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                           pathname === child.href
                             ? "text-primary bg-primary/5"
@@ -142,6 +139,7 @@ export default function MobileNav() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={closeNav}
                 className={`text-2xl font-semibold px-8 py-4 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                   pathname === link.href
                     ? "text-primary bg-primary/5"
@@ -156,6 +154,7 @@ export default function MobileNav() {
             href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@ced-consult.com&subject=CED%20Inquiry"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={closeNav}
             className="mt-6 inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary to-primary-light text-white font-semibold rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             Contact Us

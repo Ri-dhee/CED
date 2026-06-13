@@ -12,7 +12,7 @@ import {
   Legend,
   Cell,
 } from "recharts";
-import { Domain, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
+import { Domain } from "@/lib/grme-data";
 
 interface ComparisonViewProps {
   domains: Domain[];
@@ -20,6 +20,7 @@ interface ComparisonViewProps {
   previousYear: number | null;
   getCurrentDomainScore: (domainId: string) => number;
   getPreviousDomainScore: (domainId: string) => number;
+  comparabilityWarning?: string | null;
 }
 
 function ChartTooltip({
@@ -61,6 +62,7 @@ export default function ComparisonView({
   previousYear,
   getCurrentDomainScore,
   getPreviousDomainScore,
+  comparabilityWarning,
 }: ComparisonViewProps) {
   const [view, setView] = useState<"chart" | "table">("chart");
 
@@ -128,6 +130,12 @@ export default function ComparisonView({
           {Math.round(overallPrevious)} → {Math.round(overallCurrent)}
         </div>
       </div>
+
+      {comparabilityWarning && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          {comparabilityWarning}
+        </div>
+      )}
 
       {/* View toggle */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">

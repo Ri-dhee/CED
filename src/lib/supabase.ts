@@ -30,7 +30,7 @@ function createNoopSupabase(): SupabaseClient {
         if (prop === "removeChannel") {
           return () => Promise.resolve(true);
         }
-        return (..._args: unknown[]) => makeProxy();
+        return () => makeProxy();
       },
       apply() {
         return makeProxy();
@@ -53,8 +53,4 @@ export function getSupabase(): SupabaseClient {
 }
 
 // Convenience export
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_, prop) {
-    return (getSupabase() as any)[prop];
-  },
-});
+export const supabase: SupabaseClient = getSupabase();

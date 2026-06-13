@@ -1,16 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   UserRole,
   ROLE_LABELS,
   ROLE_COLORS,
   ROLE_DESCRIPTIONS,
 } from "@/lib/grme-user";
-import {
-  getActiveUsers,
-  ManagedUser,
-} from "@/lib/grme-managed-users";
+import { useManagedUsers } from "@/lib/grme-managed-users";
 
 interface LoginScreenProps {
   onLogin: (
@@ -28,17 +25,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [error, setError] = useState("");
   const [adminPassword, setAdminPasswordInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const { users: managedUsers, recordLogin } = useManagedUsers();
   const [userPassword, setUserPassword] = useState("");
-
-  useEffect(() => {
-    setManagedUsers(getActiveUsers());
-  }, []);
-
-  const isManagedUser = managedUsers.some(
-    (u) => u.name.toLowerCase() === name.toLowerCase()
-  );
   const matchedManagedUser = managedUsers.find(
     (u) => u.name.toLowerCase() === name.toLowerCase()
   );
@@ -79,6 +67,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         setError(result.error || "Incorrect password");
         return;
       }
+      recordLogin(matchedManagedUser.id);
       return;
     }
 
@@ -102,7 +91,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     setError("");
     setAdminPasswordInput("");
     setUserPassword("");
-    setSelectedUserId(null);
 
     // Auto-detect role from managed users
     const match = managedUsers.find(
@@ -110,7 +98,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     );
     if (match) {
       setSelectedRole(match.role);
-      setSelectedUserId(match.id);
     }
   };
 
@@ -141,6 +128,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               Your Name
             </label>
             <input
+              id="grme-login-name"
+              name="name"
               type="text"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
@@ -226,6 +215,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 Admin access is password-protected
               </div>
               <input
+                id="grme-admin-password"
+                name="adminPassword"
                 type="password"
                 value={adminPassword}
                 onChange={(e) => { setAdminPasswordInput(e.target.value); setError(""); }}
@@ -246,6 +237,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 Enter your password
               </div>
               <input
+                id="grme-user-password"
+                name="userPassword"
                 type="password"
                 value={userPassword}
                 onChange={(e) => { setUserPassword(e.target.value); setError(""); }}

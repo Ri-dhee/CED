@@ -55,8 +55,6 @@ const photos = [
   },
 ];
 
-const categories = ["All", ...Array.from(new Set(photos.map((p) => p.category)))];
-
 export default function Photos() {
   return (
     <div>

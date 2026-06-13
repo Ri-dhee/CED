@@ -78,12 +78,76 @@ export interface CityData {
   assessments: Record<number, AssessmentYear>;
 }
 
+/**
+ * Current scoring engine version.
+ * Bump this when benchmark thresholds, interpolation logic, or
+ * score aggregation changes.  Each AssessmentYear stores the
+ * version at computation time so longitudinal comparisons can
+ * detect drift.
+ */
+export const SCORING_ENGINE_VERSION = "1.0.0";
+
+export interface ScoringMetadata {
+  engineVersion: string;
+  benchmarkSnapshotId: string;
+  calculatedAt: string;
+}
+
 export interface AssessmentYear {
   year: number;
   indicators: Record<string, IndicatorData>;
   auditLog: AuditLog[];
   createdAt: string;
   updatedAt: string;
+  scoringMetadata?: ScoringMetadata;
+}
+
+/**
+ * Compute a deterministic hash of all benchmark thresholds across domains.
+ * Used as a lightweight snapshot ID: if the benchmarks change, the hash
+ * changes, alerting that historical scores were computed against a
+ * different reference frame.
+ */
+export function computeBenchmarkSnapshotId(domains: Domain[]): string {
+  const parts: string[] = [];
+  for (const d of domains) {
+    for (const sub of d.subdomains) {
+      for (const ind of sub.indicators) {
+        parts.push(`${ind.id}:${ind.benchmark.critical},${ind.benchmark.developing},${ind.benchmark.progressive},${ind.benchmark.exemplary}`);
+      }
+    }
+  }
+  const joined = parts.join("|");
+  let hash = 0;
+  for (let i = 0; i < joined.length; i++) {
+    const char = joined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `bm-${Math.abs(hash).toString(36)}`;
+}
+
+/**
+ * Check whether two assessment years were scored with the same engine.
+ * Returns a warning string when they differ, or null when compatible.
+ */
+export function areYearsComparable(
+  a: AssessmentYear | undefined,
+  b: AssessmentYear | undefined
+): string | null {
+  if (!a || !b) return null;
+  const va = a.scoringMetadata?.engineVersion;
+  const vb = b.scoringMetadata?.engineVersion;
+  if (!va || !vb) return null;
+  if (va !== vb) {
+    return `Scoring engines differ (${va} vs ${vb}) — scores may not be directly comparable.`;
+  }
+  const ba = a.scoringMetadata?.benchmarkSnapshotId;
+  const bb = b.scoringMetadata?.benchmarkSnapshotId;
+  if (ba && bb && ba !== bb) {
+    return `Benchmark thresholds changed between years — scores may not be directly comparable.`;
+  }
+  return null;
 }
 
 /**
@@ -267,6 +331,20 @@ export function getIndicatorScoreWeight(indicator: Indicator): number {
 
 export function getIndicatorConfidenceWeight(indicator: Indicator): number {
   return getIndicatorScoreWeight(indicator) * getIndicatorReliabilityFactor(indicator);
+}
+
+/**
+ * Minimum confidence threshold (0–100) for a score to be considered reliable
+ * enough for rankings, highlights, and "best performer" lists.
+ * Scores below this floor are visually demoted to indicate preliminary status.
+ */
+export const RELIABILITY_FLOOR = 40;
+
+/**
+ * Whether a domain-level confidence score meets the reliability floor.
+ */
+export function isConfidenceReliable(confidence: number): boolean {
+  return confidence >= RELIABILITY_FLOOR;
 }
 
 /**

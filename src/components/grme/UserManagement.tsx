@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import {
-  ManagedUser,
   useManagedUsers,
-  hashPassword,
 } from "@/lib/grme-managed-users";
 import {
   UserRole,
@@ -144,8 +142,10 @@ export default function UserManagement({ onClose }: UserManagementProps) {
               <h3 className="text-sm font-semibold text-gray-700">New User</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                  <label htmlFor="grme-user-new-name" className="block text-xs font-medium text-gray-500 mb-1">Name</label>
                   <input
+                    id="grme-user-new-name"
+                    name="name"
                     type="text"
                     value={newName}
                     onChange={(e) => { setNewName(e.target.value); setError(""); }}
@@ -155,8 +155,10 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                  <label htmlFor="grme-user-new-role" className="block text-xs font-medium text-gray-500 mb-1">Role</label>
                   <select
+                    id="grme-user-new-role"
+                    name="role"
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -169,8 +171,10 @@ export default function UserManagement({ onClose }: UserManagementProps) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Password</label>
+                  <label htmlFor="grme-user-new-password" className="block text-xs font-medium text-gray-500 mb-1">Password</label>
                   <input
+                    id="grme-user-new-password"
+                    name="password"
                     type="password"
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
@@ -180,8 +184,10 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Confirm</label>
+                  <label htmlFor="grme-user-new-password-confirm" className="block text-xs font-medium text-gray-500 mb-1">Confirm</label>
                   <input
+                    id="grme-user-new-password-confirm"
+                    name="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
@@ -243,15 +249,21 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                       {isEditing ? (
                         <div className="flex items-center gap-2">
                           <input
+                            id={`grme-user-edit-name-${user.id}`}
+                            name="editName"
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
+                            aria-label={`Edit name for ${user.name}`}
                             className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                             autoFocus
                           />
                           <select
+                            id={`grme-user-edit-role-${user.id}`}
+                            name="editRole"
                             value={editRole}
                             onChange={(e) => setEditRole(e.target.value as UserRole)}
+                            aria-label={`Edit role for ${user.name}`}
                             className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                           >
                             {ROLES.map((r) => (
@@ -338,18 +350,24 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                     {isChangingPass && (
                       <div className="flex items-center gap-2 shrink-0">
                         <input
+                          id={`grme-user-password-${user.id}`}
+                          name="newPassword"
                           type="password"
                           value={newPass}
                           onChange={(e) => setNewPass(e.target.value)}
                           placeholder="New password"
+                          aria-label={`New password for ${user.name}`}
                           className="w-32 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
                           autoFocus
                         />
                         <input
+                          id={`grme-user-password-confirm-${user.id}`}
+                          name="confirmNewPassword"
                           type="password"
                           value={confirmPass}
                           onChange={(e) => setConfirmPass(e.target.value)}
                           placeholder="Confirm"
+                          aria-label={`Confirm new password for ${user.name}`}
                           className="w-28 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
                         />
                         <button

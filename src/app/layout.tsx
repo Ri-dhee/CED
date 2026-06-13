@@ -178,25 +178,25 @@ export default function RootLayout({
                   innovative solutions, and unwavering commitment to
                   environmental stewardship.
                 </p>
-                <div className="flex gap-3" role="list" aria-label="Social media links">
+                <ul className="flex gap-3 list-none p-0 m-0" aria-label="Social media links">
                   {[
                     { label: "LinkedIn", href: "#" },
                     { label: "X", href: "#" },
                     { label: "Facebook", href: "#" },
                   ].map((social) => (
-                    <a
-                      key={social.label}
-                      href={social.href}
-                      role="listitem"
-                      className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-white/60 text-xs font-bold hover:bg-white/20 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
-                      aria-label={social.label}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {social.label.slice(0, 2)}
-                    </a>
+                    <li key={social.label}>
+                      <a
+                        href={social.href}
+                        className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-white/60 text-xs font-bold hover:bg-white/20 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                        aria-label={social.label}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {social.label.slice(0, 2)}
+                      </a>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
               <div>
                 <h3 className="font-semibold text-white mb-6 text-sm uppercase tracking-wider">

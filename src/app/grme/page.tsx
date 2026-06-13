@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   CITIES,
   getStatusFromScore,
   getStatusColor,
-  getStatusBg,
+  areYearsComparable,
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
@@ -16,8 +16,6 @@ import {
   exportSummaryCsv,
 } from "@/lib/grme-export";
 import RadarChart from "@/components/grme/RadarChart";
-import BarChart from "@/components/grme/BarChart";
-import ProgressRings from "@/components/grme/ProgressRings";
 import AnimatedScore from "@/components/grme/AnimatedScore";
 import DataQualityBar from "@/components/grme/DataQualityBar";
 import InsightsPanel from "@/components/grme/InsightsPanel";
@@ -33,8 +31,10 @@ import YearSelector from "@/components/grme/YearSelector";
 import TrendChart from "@/components/grme/TrendChart";
 import UserManagement from "@/components/grme/UserManagement";
 import ApiStatus, { SyncProvider, useSync } from "@/components/grme/ApiStatus";
+import { resolveOverlayYears } from "@/lib/grme-overlays";
 
 type Tab = "dashboard" | "entry" | "framework" | "audit";
+const YEAR_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#0ea5e9", "#14b8a6"];
 
 export default function GRMEPage() {
   const { user, loaded: userLoaded, login, logout, switchRole } = useGrmeUser();
@@ -69,7 +69,6 @@ function GRMEApp({
   onSwitchRole: (role: "admin" | "editor" | "viewer") => void;
   onLogout: () => void;
 }) {
-  const YEAR_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#0ea5e9", "#14b8a6"];
   const framework = useGRMEFramework();
   const { trackSync } = useSync();
   const currentYear = new Date().getFullYear();
@@ -88,6 +87,7 @@ function GRMEApp({
     updateIndicator,
     addAuditNote,
     getDomainScore,
+    getDomainStatsForAssessment,
     getOverallScore,
     getDataEntryStats,
     getDataEntryStatsForYear,
@@ -182,6 +182,15 @@ function GRMEApp({
     return result;
   }, [framework.domains, getDomainScore]);
 
+  const getDomainConfidence = useCallback(
+    (domainId: string): number => {
+      const domain = framework.domains.find((d) => d.id === domainId);
+      if (!domain) return 0;
+      return getDomainStatsForAssessment(domain, assessment).confidence;
+    },
+    [framework.domains, getDomainStatsForAssessment, assessment]
+  );
+
   const previousYear = useMemo(() => {
     const sortedYears = [...availableYears].sort((a, b) => a - b);
     const currentIdx = sortedYears.indexOf(selectedYear);
@@ -189,28 +198,16 @@ function GRMEApp({
   }, [availableYears, selectedYear]);
 
   const overlayYears = useMemo(() => {
-    if (overlayMode === "all") {
-      return [...availableYears]
-        .filter((year) => year !== selectedYear)
-        .sort((a, b) => a - b);
-    }
-    if (overlayMode === "specific") {
-      return selectedOverlayYears.slice().sort((a, b) => a - b);
-    }
-    return previousYear ? [previousYear] : [];
+    return resolveOverlayYears({
+      overlayMode,
+      availableYears,
+      selectedYear,
+      selectedOverlayYears,
+      previousYear,
+    });
   }, [availableYears, overlayMode, previousYear, selectedOverlayYears, selectedYear]);
 
   const comparisonYear = overlayYears.length === 1 ? overlayYears[0] : null;
-
-  useEffect(() => {
-    if (overlayMode !== "specific") return;
-
-    setSelectedOverlayYears((current) => {
-      const next = current.filter((year) => availableYears.includes(year) && year !== selectedYear);
-      if (next.length > 0) return next;
-      return previousYear ? [previousYear] : next;
-    });
-  }, [availableYears, overlayMode, previousYear, selectedYear]);
 
   const toggleOverlayYear = useCallback((year: number) => {
     setSelectedOverlayYears((current) =>
@@ -227,6 +224,13 @@ function GRMEApp({
     () => (comparisonYear ? getDataEntryStatsForYear(comparisonYear) : null),
     [comparisonYear, getDataEntryStatsForYear]
   );
+  const comparabilityWarning = useMemo(() => {
+    if (!comparisonYear) return null;
+    return areYearsComparable(
+      cityData.assessments[selectedYear],
+      cityData.assessments[comparisonYear]
+    );
+  }, [cityData, selectedYear, comparisonYear]);
   const lowConfidenceYears = useMemo(
     () => availableYears.filter((year) => getDataEntryStatsForYear(year).confidence < 80),
     [availableYears, getDataEntryStatsForYear]
@@ -255,7 +259,7 @@ function GRMEApp({
       ),
       color: YEAR_COLORS[idx % YEAR_COLORS.length],
     }));
-  }, [YEAR_COLORS, framework.domains, getDomainScoreForYear, overlayYears]);
+  }, [framework.domains, getDomainScoreForYear, overlayYears]);
 
   const isAdmin = canEditFramework(user.role);
   const canEdit = canEnterData(user.role);
@@ -542,6 +546,7 @@ function GRMEApp({
                   <RadarChart
                     domains={framework.domains}
                     getDomainScore={getDomainScore}
+                    getDomainConfidence={getDomainConfidence}
                     comparisonSeries={comparisonSeries}
                     size={340}
                     onDomainClick={(id) => {
@@ -594,6 +599,7 @@ function GRMEApp({
               <InsightsPanel
                 domains={framework.domains}
                 getDomainScore={getDomainScore}
+                getDomainConfidence={getDomainConfidence}
                 getDomainScoreForYear={getDomainScoreForYear}
                 selectedYear={selectedYear}
                 availableYears={availableYears}
@@ -664,6 +670,7 @@ function GRMEApp({
                   previousYear={comparisonYear}
                   getCurrentDomainScore={getDomainScore}
                   getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, comparisonYear || selectedYear)}
+                  comparabilityWarning={comparabilityWarning}
                 />
               </div>
             )}
@@ -704,6 +711,7 @@ function GRMEApp({
                   domainColors={Object.fromEntries(
                     framework.domains.map((d) => [d.id, d.color])
                   )}
+                  comparabilityWarning={comparabilityWarning}
                 />
               </div>
             )}
@@ -844,7 +852,7 @@ function GRMEApp({
                 <div className="space-y-3">
                   {currentSubdomain?.indicators.map((indicator) => (
                     <DataEntryForm
-                      key={indicator.id}
+                      key={`${indicator.id}-${selectedYear}-${String(assessment.indicators[indicator.id]?.value ?? "")}-${assessment.indicators[indicator.id]?.notes ?? ""}`}
                       indicator={indicator}
                       value={
                         assessment.indicators[indicator.id]?.value ?? null

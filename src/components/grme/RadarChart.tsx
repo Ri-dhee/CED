@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Domain, getStatusFromScore, getStatusColor } from "@/lib/grme-data";
+import { Domain, getStatusFromScore, getStatusColor, isConfidenceReliable } from "@/lib/grme-data";
 
 interface RadarChartProps {
   domains: Domain[];
   getDomainScore: (domainId: string) => number;
+  getDomainConfidence?: (domainId: string) => number;
   comparisonDomainScores?: Record<string, number> | null;
   comparisonLabel?: string;
   comparisonSeries?: Array<{
@@ -20,6 +21,7 @@ interface RadarChartProps {
 export default function RadarChart({
   domains,
   getDomainScore,
+  getDomainConfidence,
   comparisonDomainScores = null,
   comparisonLabel,
   comparisonSeries = null,
@@ -180,6 +182,8 @@ export default function RadarChart({
           const status = getStatusFromScore(score);
           const color = getStatusColor(status);
           const isHovered = hoveredDomain === domain.id;
+          const confidence = getDomainConfidence?.(domain.id) ?? 100;
+          const reliable = isConfidenceReliable(confidence);
 
           return (
             <g
@@ -199,6 +203,8 @@ export default function RadarChart({
                 stroke="white"
                 strokeWidth="2.5"
                 className="transition-all duration-200"
+                opacity={reliable ? 1 : 0.5}
+                style={reliable ? undefined : { filter: "grayscale(1)" }}
               />
               {isHovered && (
                 <circle
@@ -209,6 +215,19 @@ export default function RadarChart({
                   stroke={color}
                   strokeWidth="2"
                   opacity="0.3"
+                />
+              )}
+              {/* Reliability ghost ring for low-confidence */}
+              {!reliable && (
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="11"
+                  fill="none"
+                  stroke="#9ca3af"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 2"
+                  opacity="0.5"
                 />
               )}
             </g>
@@ -222,9 +241,11 @@ export default function RadarChart({
           const status = getStatusFromScore(score);
           const color = getStatusColor(status);
           const isHovered = hoveredDomain === domain.id;
+          const confidence = getDomainConfidence?.(domain.id) ?? 100;
+          const reliable = isConfidenceReliable(confidence);
 
           return (
-            <g key={domain.id}>
+            <g key={domain.id} opacity={reliable ? 1 : 0.55}>
               <text
                 x={point.x}
                 y={point.y - 10}
@@ -234,6 +255,15 @@ export default function RadarChart({
                 }`}
               >
                 {domain.shortName}
+                {!reliable && (
+                  <tspan
+                    dx="3"
+                    className="fill-amber-500"
+                    style={{ textDecoration: "none" }}
+                  >
+                    (?)
+                  </tspan>
+                )}
               </text>
               <text
                 x={point.x}
@@ -297,6 +327,26 @@ export default function RadarChart({
               {Math.round(scores[hoveredIndex])}
             </span>
           </div>
+          {(() => {
+            const conf = getDomainConfidence?.(hoveredDomain!) ?? 100;
+            return (
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-gray-500">Confidence:</span>
+                <span
+                  className={`font-semibold ${
+                    isConfidenceReliable(conf)
+                      ? "text-emerald-600"
+                      : "text-amber-600"
+                  }`}
+                >
+                  {conf}%
+                </span>
+                {!isConfidenceReliable(conf) && (
+                  <span className="text-amber-500 text-[10px]">(preliminary)</span>
+                )}
+              </div>
+            );
+          })()}
           {(comparisonScores || multiComparisonSeries) && (
             <div className="flex items-center gap-2 mt-1">
               {comparisonScores && !multiComparisonSeries && (
