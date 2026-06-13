@@ -366,7 +366,7 @@ export function useGRMEData(
   // Real-time subscription — auto-refresh when data changes in Supabase
   useEffect(() => {
     if (!hasSupabaseConfig) return;
-    const channel = supabase
+    const channel = supabase()
       .channel("assessment-changes")
       .on(
         "postgres_changes",
@@ -378,7 +378,7 @@ export function useGRMEData(
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase().removeChannel(channel);
     };
   }, [debouncedRefresh]);
 

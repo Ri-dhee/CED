@@ -95,7 +95,7 @@ export function useGRMEFramework() {
   // Real-time subscription — auto-refresh when framework changes
   useEffect(() => {
     if (!hasSupabaseConfig) return;
-    const channel = supabase
+    const channel = supabase()
       .channel("framework-changes")
       .on(
         "postgres_changes",
@@ -107,7 +107,7 @@ export function useGRMEFramework() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase().removeChannel(channel);
     };
   }, [debouncedRefreshFramework]);
 

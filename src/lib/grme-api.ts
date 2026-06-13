@@ -17,7 +17,7 @@ import { ManagedUser } from "./grme-managed-users";
 // ── Assessments ──────────────────────────────────────────────────
 
 export async function loadAssessments(): Promise<Record<string, CityData>> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("assessment_data")
     .select("*");
 
@@ -74,7 +74,7 @@ export async function saveAssessment(
   indicatorId: string,
   data: IndicatorData
 ): Promise<void> {
-  const { error } = await supabase.from("assessment_data").upsert(
+  const { error } = await supabase().from("assessment_data").upsert(
     {
       city_id: cityId,
       year,
@@ -108,7 +108,7 @@ export async function saveAssessments(
 
   if (rows.length === 0) return;
 
-  const { error } = await supabase
+  const { error } = await supabase()
     .from("assessment_data")
     .upsert(rows, { onConflict: "city_id,year,indicator_id" });
   if (error) throw error;
@@ -118,7 +118,7 @@ export async function deleteYear(
   cityId: string,
   year: number
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabase()
     .from("assessment_data")
     .delete()
     .eq("city_id", cityId)
@@ -129,7 +129,7 @@ export async function deleteYear(
 // ── Audit Log ────────────────────────────────────────────────────
 
 export async function loadAuditLog(): Promise<Record<string, unknown>[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("audit_log")
     .select("*")
     .order("timestamp", { ascending: false })
@@ -145,7 +145,7 @@ export async function addAuditEntry(
   indicatorId: string,
   entry: AuditEntry
 ): Promise<void> {
-  const { error } = await supabase.from("audit_log").insert({
+  const { error } = await supabase().from("audit_log").insert({
     city_id: cityId,
     year,
     indicator_id: indicatorId,
@@ -164,7 +164,7 @@ export async function addAuditEntry(
 // ── Framework ────────────────────────────────────────────────────
 
 export async function loadFramework(): Promise<FrameworkStorage | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("framework")
     .select("value")
     .eq("key", "framework")
@@ -178,7 +178,7 @@ export async function loadFramework(): Promise<FrameworkStorage | null> {
 }
 
 export async function saveFramework(framework: FrameworkStorage): Promise<void> {
-  const { error } = await supabase.from("framework").upsert(
+  const { error } = await supabase().from("framework").upsert(
     {
       key: "framework",
       value: framework,
@@ -192,7 +192,7 @@ export async function saveFramework(framework: FrameworkStorage): Promise<void> 
 // ── Managed Users ────────────────────────────────────────────────
 
 export async function loadUsers(): Promise<ManagedUser[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("managed_users")
     .select("*");
 
@@ -205,7 +205,7 @@ export async function loadUsers(): Promise<ManagedUser[]> {
 
 export async function saveUsers(users: ManagedUser[]): Promise<void> {
   // Delete all then insert (simple approach for small user lists)
-  const { error: delError } = await supabase
+  const { error: delError } = await supabase()
     .from("managed_users")
     .delete()
     .neq("id", "__delete_all__");
@@ -214,7 +214,7 @@ export async function saveUsers(users: ManagedUser[]): Promise<void> {
 
   if (users.length === 0) return;
 
-  const { error } = await supabase.from("managed_users").insert(
+  const { error } = await supabase().from("managed_users").insert(
     users.map((u) => ({
       id: u.id,
       name: u.name,
@@ -232,7 +232,7 @@ export async function saveUsers(users: ManagedUser[]): Promise<void> {
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const { error } = await supabase.from("config").select("key").limit(1);
+    const { error } = await supabase().from("config").select("key").limit(1);
     return !error;
   } catch {
     return false;

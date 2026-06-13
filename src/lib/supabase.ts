@@ -52,5 +52,9 @@ export function getSupabase(): SupabaseClient {
   return client;
 }
 
-// Convenience export
-export const supabase: SupabaseClient = getSupabase();
+// Convenience export — lazy singleton
+let _supabase: SupabaseClient | null = null;
+export function supabase(): SupabaseClient {
+  if (!_supabase) _supabase = getSupabase();
+  return _supabase;
+}

@@ -144,7 +144,7 @@ export function useManagedUsers() {
 
   // Real-time subscription — auto-refresh when users change
   useEffect(() => {
-    const channel = supabase
+    const channel = supabase()
       .channel("users-changes")
         .on(
           "postgres_changes",
@@ -163,7 +163,7 @@ export function useManagedUsers() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase().removeChannel(channel);
     };
   }, []);
 

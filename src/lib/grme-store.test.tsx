@@ -81,15 +81,17 @@ const mockApiFns = {
 
 let supabaseHasConfig = false;
 
+const mockSupabaseClient = {
+  channel: vi.fn(() => ({
+    on: vi.fn().mockReturnThis(),
+    subscribe: vi.fn(),
+  })),
+  removeChannel: vi.fn(),
+};
+
 vi.mock("@/lib/supabase", () => ({
   get hasSupabaseConfig() { return supabaseHasConfig; },
-  supabase: {
-    channel: vi.fn(() => ({
-      on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn(),
-    })),
-    removeChannel: vi.fn(),
-  },
+  supabase: vi.fn(() => mockSupabaseClient),
 }));
 
 vi.mock("@/lib/grme-api", () => mockApiFns);
