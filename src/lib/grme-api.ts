@@ -138,41 +138,33 @@ export async function loadAuditLogsForAssessment(): Promise<
   const result: Record<string, Record<number, AuditLog[]>> = {};
 
   for (const row of raw) {
-    const cityId = row.city_id as string;
-    const year = row.year as number;
-    const indicatorId = row.indicator_id as string;
+    const cityId = (row.city_id as string) || "";
+    const year = (row.year as number) || 0;
+    const indicatorId = (row.indicator_id as string) || "";
+    if (!cityId || !year || !indicatorId) continue;
     if (!result[cityId]) result[cityId] = {};
     if (!result[cityId][year]) result[cityId][year] = [];
+
+    const entry = {
+      id: (row.entry_id as string) || "",
+      timestamp: (row.timestamp as string) || new Date().toISOString(),
+      user: (row.user as string) || "unknown",
+      action: (row.action as string) as "create" | "update" | "review",
+      field: (row.field as string) || "",
+      oldValue: ((row.old_value as string) || undefined) as string | undefined,
+      newValue: (row.new_value as string) || "",
+      notes: ((row.notes as string) || undefined) as string | undefined,
+    };
 
     const existing = result[cityId][year].find(
       (a) => a.indicatorId === indicatorId
     );
     if (existing) {
-      existing.entries.push({
-        id: row.entry_id as string,
-        timestamp: row.timestamp as string,
-        user: row.user as string,
-        action: row.action as "create" | "update" | "review",
-        field: row.field as string,
-        oldValue: (row.old_value as string) || undefined,
-        newValue: row.new_value as string,
-        notes: (row.notes as string) || undefined,
-      });
+      existing.entries.push(entry);
     } else {
       result[cityId][year].push({
         indicatorId,
-        entries: [
-          {
-            id: row.entry_id as string,
-            timestamp: row.timestamp as string,
-            user: row.user as string,
-            action: row.action as "create" | "update" | "review",
-            field: row.field as string,
-            oldValue: (row.old_value as string) || undefined,
-            newValue: row.new_value as string,
-            notes: (row.notes as string) || undefined,
-          },
-        ],
+        entries: [entry],
       });
     }
   }
@@ -337,8 +329,16 @@ function getCityName(cityId: string): string {
   return cities[cityId] || cityId;
 }
 
-// ── Queue status (compatibility) ─────────────────────────────────
+// ── Queue status ────────────────────────────────────────────────
 
 export function getQueueStatus(): { active: number; pending: number } {
-  return { active: 0, pending: 0 };
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("grme-pending-mutations") : null;
+    if (!raw) return { active: 0, pending: 0 };
+    const queue = JSON.parse(raw);
+    const pending = Array.isArray(queue) ? queue.length : 0;
+    return { active: 0, pending };
+  } catch {
+    return { active: 0, pending: 0 };
+  }
 }

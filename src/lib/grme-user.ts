@@ -10,8 +10,6 @@ export interface GrmeUser {
   loginAt: string;
 }
 
-const STORAGE_KEY = "grme-user";
-
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Admin",
   editor: "Editor",

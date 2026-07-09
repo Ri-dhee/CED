@@ -193,12 +193,20 @@ interface PendingMutation {
   indicators?: Record<string, IndicatorData>;
 }
 
+function isPendingMutation(v: unknown): v is PendingMutation {
+  if (!v || typeof v !== "object") return false;
+  const m = v as Record<string, unknown>;
+  return typeof m.cityId === "string" && typeof m.year === "number" && typeof m.type === "string";
+}
+
 function loadQueue(): PendingMutation[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(QUEUE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isPendingMutation);
   } catch {
     return [];
   }
@@ -319,7 +327,8 @@ async function drainQueue(): Promise<void> {
           await api.deleteYear(m.cityId, m.year);
           break;
       }
-    } catch {
+    } catch (err) {
+      console.error(`drainQueue: mutation failed for ${m.cityId}/${m.year} type=${m.type}:`, err);
       stillPending.push(m);
     }
   }
@@ -456,6 +465,7 @@ export function useGRMEData(
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
   const [apiAvailable, setApiAvailable] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
   const domainsRef = useRef(domains);
   const currentUser = userName || "Stakeholder";
   const currentYear = selectedYear || new Date().getFullYear();
@@ -522,6 +532,7 @@ export function useGRMEData(
           saveAllData(localData);
           setAllData(localData);
           setApiAvailable(false);
+          setLoading(false);
         }
         return;
       }
@@ -540,6 +551,7 @@ export function useGRMEData(
           setAllData(merged);
           saveAllData(merged);
           setApiAvailable(true);
+          setLoading(false);
           await drainQueue();
         }
       } catch {
@@ -549,6 +561,7 @@ export function useGRMEData(
           saveAllData(withPending);
           setAllData(withPending);
           setApiAvailable(false);
+          setLoading(false);
         }
       }
     }
@@ -1128,6 +1141,7 @@ export function useGRMEData(
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,
+    loading,
     refreshData: debouncedRefresh,
   };
 }

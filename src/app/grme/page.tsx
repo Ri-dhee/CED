@@ -94,6 +94,7 @@ function GRMEApp({
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,
+    loading,
     refreshData,
   } = useGRMEData(framework.domains, user.name, selectedYear);
 
@@ -111,20 +112,22 @@ function GRMEApp({
   );
   const [showUserManagement, setShowUserManagement] = useState(false);
 
-  // Sync-wrapped mutations — every save shows status
+  // Sync-wrapped mutations — every save shows status.
+  // No explicit refreshData() needed: updateIndicator / addAuditNote /
+  // createYear / deleteYear already update local state & write to Supabase,
+  // and the real-time subscription triggers a background refresh.
   const trackedUpdateIndicator = useCallback(
     async (indicatorId: string, value: number | string | boolean, notes?: string) => {
       const syncId = `indicator-${selectedCity}-${selectedYear}-${indicatorId}`;
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await updateIndicator(indicatorId, value, notes);
-        await refreshData();
         onSuccess();
       } catch {
         onError();
       }
     },
-    [updateIndicator, trackSync, selectedCity, selectedYear, refreshData]
+    [updateIndicator, trackSync, selectedCity, selectedYear]
   );
 
   const trackedAddAuditNote = useCallback(
@@ -133,13 +136,12 @@ function GRMEApp({
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await addAuditNote(indicatorId, note);
-        await refreshData();
         onSuccess();
       } catch {
         onError();
       }
     },
-    [addAuditNote, trackSync, selectedCity, selectedYear, refreshData]
+    [addAuditNote, trackSync, selectedCity, selectedYear]
   );
 
   const trackedCreateYear = useCallback(
@@ -148,13 +150,12 @@ function GRMEApp({
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await createYear(year, copyFrom);
-        await refreshData();
         onSuccess();
       } catch {
         onError();
       }
     },
-    [createYear, trackSync, selectedCity, refreshData]
+    [createYear, trackSync, selectedCity]
   );
 
   const trackedDeleteYear = useCallback(
@@ -163,13 +164,18 @@ function GRMEApp({
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await deleteYear(year);
-        await refreshData();
+        if (selectedYear === year) {
+          const remaining = availableYears.filter((y) => y !== year);
+          if (remaining.length > 0) {
+            setSelectedYear(remaining.sort((a, b) => b - a)[0]);
+          }
+        }
         onSuccess();
       } catch {
         onError();
       }
     },
-    [deleteYear, trackSync, selectedCity, refreshData]
+    [deleteYear, trackSync, selectedCity, selectedYear, availableYears]
   );
 
   const currentDomain =
@@ -268,6 +274,17 @@ function GRMEApp({
 
   const isAdmin = canEditFramework(user.role);
   const canEdit = canEnterData(user.role);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <div className="text-gray-400 text-sm">Loading dashboard data...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
@@ -484,6 +501,7 @@ function GRMEApp({
               </div>
 
               {/* Radar Chart — core visual */}
+            {framework.domains.length > 0 ? (
             <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                   <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
@@ -566,6 +584,11 @@ function GRMEApp({
                   />
                 </div>
               </div>
+            ) : (
+              <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-center min-h-[200px]">
+                <p className="text-sm text-gray-400">Framework not yet configured.</p>
+              </div>
+            )}
 
               {/* Right column: Data Quality + Benchmark Legend */}
               <div className="lg:col-span-4 space-y-6">

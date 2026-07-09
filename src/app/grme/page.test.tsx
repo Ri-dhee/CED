@@ -50,7 +50,7 @@ vi.mock("@/lib/grme-store", () => ({
     getDataEntryStatsForYear: () => ({ total: 0, filled: 0, missing: 0, percentage: 0, confidence: 0 }),
     selectedCity: "thimphu",
     setSelectedCity: vi.fn(),
-    cityData: { cityId: "thimphu", cityName: "Thimphu", assessments: {} },
+    loading: false,
     apiAvailable: false,
     refreshData: vi.fn(),
   }),
