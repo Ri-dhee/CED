@@ -77,6 +77,7 @@ const mockApiFns = {
   saveAssessment: vi.fn(),
   deleteYear: vi.fn(),
   addAuditEntry: vi.fn(),
+  loadAuditLogsForAssessment: vi.fn().mockResolvedValue({}),
 };
 
 let supabaseHasConfig = false;
@@ -365,6 +366,10 @@ describe("useGRMEData (offline mode)", () => {
   });
 });
 
+function getQueue() {
+  return JSON.parse(localStorage.getItem("grme-pending-mutations") || "[]");
+}
+
 // ── Tests: Online mode (Supabase available) ──────────────────
 
 describe("useGRMEData (online mode)", () => {
@@ -414,5 +419,98 @@ describe("useGRMEData (online mode)", () => {
       await result.current.deleteYear(2027);
     });
     expect(mockApiFns.deleteYear).toHaveBeenCalledWith("thimphu", 2027);
+  });
+
+  it("drains the offline queue on init when API is available", async () => {
+    // Pre-seed the queue with a pending mutation
+    localStorage.setItem("grme-pending-mutations", JSON.stringify([
+      { type: "saveIndicator", cityId: "thimphu", year: 2026, indicatorId: "ss-1", data: { value: 75, indicatorId: "ss-1", lastUpdated: "", updatedBy: "Tester" } },
+    ]));
+    const { result } = await mountHook();
+    await waitFor(() => {
+      expect(result.current.apiAvailable).toBe(true);
+    });
+    expect(mockApiFns.saveAssessment).toHaveBeenCalledWith(
+      "thimphu", 2026, "ss-1",
+      expect.objectContaining({ value: 75 })
+    );
+    // Queue should be empty after drain
+    expect(getQueue()).toHaveLength(0);
+  });
+});
+
+// ── Tests: Offline queue ──────────────────────────────────────
+
+describe("offline mutation queue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    supabaseHasConfig = false;
+    localStorage.clear();
+  });
+
+  it("queues saveIndicator when offline", async () => {
+    const { result } = await mountHook();
+    await updateAndWait(result, "ss-1", 42, "Offline test");
+    const queue = getQueue();
+    expect(queue.length).toBeGreaterThanOrEqual(1);
+    const save = queue.find((m: Record<string, unknown>) => m.type === "saveIndicator");
+    expect(save).toBeDefined();
+    expect(save.cityId).toBe("thimphu");
+    expect(save.indicatorId).toBe("ss-1");
+    expect(save.data.value).toBe(42);
+  });
+
+  it("queues addAuditEntry when offline", async () => {
+    const { result } = await mountHook();
+    await updateAndWait(result, "ss-1", 42);
+    const queue = getQueue();
+    const audit = queue.find((m: Record<string, unknown>) => m.type === "addAuditEntry");
+    expect(audit).toBeDefined();
+    expect(audit.entry.action).toBe("create");
+    expect(audit.entry.newValue).toBe("42");
+  });
+
+  it("deduplicates saveIndicator for the same indicator", async () => {
+    const { result } = await mountHook();
+    await updateAndWait(result, "ss-1", 10);
+    await updateAndWait(result, "ss-1", 20);
+    await updateAndWait(result, "ss-1", 30);
+    const saves = getQueue().filter((m: Record<string, unknown>) => m.type === "saveIndicator");
+    expect(saves).toHaveLength(1);
+    expect(saves[0].data.value).toBe(30);
+  });
+
+  it("queues createYear when offline", async () => {
+    const { result } = await mountHook();
+    await act(async () => {
+      await result.current.createYear(2027);
+    });
+    const queue = getQueue();
+    const create = queue.find((m: Record<string, unknown>) => m.type === "createYear");
+    expect(create).toBeDefined();
+    expect(create.year).toBe(2027);
+  });
+
+  it("queues deleteYear when offline", async () => {
+    const { result } = await mountHook();
+    await act(async () => {
+      await result.current.deleteYear(2026);
+    });
+    const queue = getQueue();
+    const del = queue.find((m: Record<string, unknown>) => m.type === "deleteYear");
+    expect(del).toBeDefined();
+    expect(del.year).toBe(2026);
+  });
+
+  it("does NOT queue mutations when online", async () => {
+    supabaseHasConfig = true;
+    mockApiFns.loadAssessments = vi.fn().mockResolvedValue({});
+    mockApiFns.loadAuditLogsForAssessment = vi.fn().mockResolvedValue({});
+    const { result } = await mountHook();
+    await waitFor(() => {
+      expect(result.current.apiAvailable).toBe(true);
+    });
+    await updateAndWait(result, "ss-1", 99);
+    expect(getQueue()).toHaveLength(0);
   });
 });

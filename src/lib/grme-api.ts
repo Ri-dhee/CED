@@ -7,6 +7,7 @@
 
 import { supabase } from "./supabase";
 import {
+  AuditLog,
   CityData,
   IndicatorData,
   AuditEntry,
@@ -127,6 +128,57 @@ export async function deleteYear(
 }
 
 // ── Audit Log ────────────────────────────────────────────────────
+
+/** Load audit entries grouped by city → year → indicatorId.
+ *  Returns a structure ready to merge into CityData. */
+export async function loadAuditLogsForAssessment(): Promise<
+  Record<string, Record<number, AuditLog[]>>
+> {
+  const raw = await loadAllAuditLogEntries();
+  const result: Record<string, Record<number, AuditLog[]>> = {};
+
+  for (const row of raw) {
+    const cityId = row.city_id as string;
+    const year = row.year as number;
+    const indicatorId = row.indicator_id as string;
+    if (!result[cityId]) result[cityId] = {};
+    if (!result[cityId][year]) result[cityId][year] = [];
+
+    const existing = result[cityId][year].find(
+      (a) => a.indicatorId === indicatorId
+    );
+    if (existing) {
+      existing.entries.push({
+        id: row.entry_id as string,
+        timestamp: row.timestamp as string,
+        user: row.user as string,
+        action: row.action as "create" | "update" | "review",
+        field: row.field as string,
+        oldValue: (row.old_value as string) || undefined,
+        newValue: row.new_value as string,
+        notes: (row.notes as string) || undefined,
+      });
+    } else {
+      result[cityId][year].push({
+        indicatorId,
+        entries: [
+          {
+            id: row.entry_id as string,
+            timestamp: row.timestamp as string,
+            user: row.user as string,
+            action: row.action as "create" | "update" | "review",
+            field: row.field as string,
+            oldValue: (row.old_value as string) || undefined,
+            newValue: row.new_value as string,
+            notes: (row.notes as string) || undefined,
+          },
+        ],
+      });
+    }
+  }
+
+  return result;
+}
 
 export async function loadAuditLog(
   page: number = 0,

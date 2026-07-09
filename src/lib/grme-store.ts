@@ -178,16 +178,163 @@ function saveAllData(data: Record<string, CityData>): void {
   }
 }
 
+// ── Offline mutation queue ─────────────────────────────────────
+
+const QUEUE_KEY = "grme-pending-mutations";
+
+interface PendingMutation {
+  id: string;
+  type: "saveIndicator" | "addAuditEntry" | "createYear" | "deleteYear";
+  cityId: string;
+  year: number;
+  indicatorId?: string;
+  data?: IndicatorData;
+  entry?: AuditEntry;
+  indicators?: Record<string, IndicatorData>;
+}
+
+function loadQueue(): PendingMutation[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(QUEUE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveQueue(queue: PendingMutation[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (queue.length === 0) {
+      localStorage.removeItem(QUEUE_KEY);
+    } else {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    }
+  } catch (e) {
+    console.error("Failed to save offline queue:", e);
+  }
+}
+
+function enqueueMutation(mutation: PendingMutation): void {
+  const queue = loadQueue();
+  const key = mutation.type === "saveIndicator" || mutation.type === "addAuditEntry"
+    ? `${mutation.cityId}:${mutation.year}:${mutation.indicatorId}`
+    : `${mutation.type}:${mutation.cityId}:${mutation.year}`;
+
+  const idx = queue.findIndex((m) => {
+    if (m.type !== mutation.type) return false;
+    if (m.type === "saveIndicator" || m.type === "addAuditEntry") {
+      return `${m.cityId}:${m.year}:${m.indicatorId}` === key;
+    }
+    return `${m.type}:${m.cityId}:${m.year}` === key;
+  });
+
+  if (idx >= 0) {
+    queue[idx] = mutation;
+  } else {
+    queue.push(mutation);
+  }
+  saveQueue(queue);
+}
+
+/** Overlay pending mutation values onto server data for live display.
+ *  This ensures offline edits still show in the UI before they're synced. */
+function applyPendingMutationsToData(
+  data: Record<string, CityData>
+): Record<string, CityData> {
+  const queue = loadQueue();
+  const next: Record<string, CityData> = deepClone(data);
+
+  for (const m of queue) {
+    if (m.type === "saveIndicator" && m.data) {
+      const city = next[m.cityId] = next[m.cityId] || {
+        cityId: m.cityId, cityName: m.cityId, assessments: {},
+      };
+      const year = city.assessments[m.year] = city.assessments[m.year] || {
+        year: m.year, indicators: {}, auditLog: [],
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      year.indicators[m.indicatorId!] = m.data;
+    }
+    if (m.type === "addAuditEntry" && m.entry) {
+      const city = next[m.cityId] = next[m.cityId] || {
+        cityId: m.cityId, cityName: m.cityId, assessments: {},
+      };
+      const year = city.assessments[m.year] = city.assessments[m.year] || {
+        year: m.year, indicators: {}, auditLog: [],
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      const existing = year.auditLog.find((a) => a.indicatorId === m.indicatorId);
+      if (existing) {
+        existing.entries.push(m.entry);
+      } else {
+        year.auditLog.push({ indicatorId: m.indicatorId!, entries: [m.entry] });
+      }
+    }
+    if (m.type === "createYear") {
+      const city = next[m.cityId] = next[m.cityId] || {
+        cityId: m.cityId, cityName: m.cityId, assessments: {},
+      };
+      if (!city.assessments[m.year]) {
+        city.assessments[m.year] = {
+          year: m.year, indicators: m.indicators || {}, auditLog: [],
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        };
+      }
+    }
+    if (m.type === "deleteYear") {
+      const city = next[m.cityId];
+      if (city) delete city.assessments[m.year];
+    }
+  }
+
+  return next;
+}
+
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/** Replay all pending offline mutations to Supabase. */
+async function drainQueue(): Promise<void> {
+  const queue = loadQueue();
+  if (queue.length === 0) return;
+
+  const stillPending: PendingMutation[] = [];
+  for (const m of queue) {
+    try {
+      switch (m.type) {
+        case "saveIndicator":
+          if (m.data) await api.saveAssessment(m.cityId, m.year, m.indicatorId!, m.data);
+          break;
+        case "addAuditEntry":
+          if (m.entry) await api.addAuditEntry(m.cityId, m.year, m.indicatorId!, m.entry);
+          break;
+        case "createYear":
+          await api.saveAssessments(m.cityId, m.year, m.indicators || {});
+          break;
+        case "deleteYear":
+          await api.deleteYear(m.cityId, m.year);
+          break;
+      }
+    } catch {
+      stillPending.push(m);
+    }
+  }
+  saveQueue(stillPending);
+}
+
+/** In a multi-stakeholder system the server is the source of truth.
+ *  Local (cached) data never overrides remote data — only fills gaps
+ *  when the server doesn't have a given city/year yet. */
 function mergeAssessmentYear(
   remote: AssessmentYear | undefined,
   local: AssessmentYear | undefined
 ): AssessmentYear | undefined {
   if (!remote) return local;
-  if (!local) return remote;
-
-  const remoteTs = remote.updatedAt || remote.createdAt || "";
-  const localTs = local.updatedAt || local.createdAt || "";
-  return localTs >= remoteTs ? local : remote;
+  return remote;
 }
 
 function mergeCityData(remote: CityData, local: CityData): CityData {
@@ -204,6 +351,44 @@ function mergeCityData(remote: CityData, local: CityData): CityData {
     cityName: local.cityName || remote.cityName,
     assessments,
   };
+}
+
+function mergeAuditLogsIntoData(
+  data: Record<string, CityData>,
+  auditLogs: Record<string, Record<number, AuditLog[]>>
+): Record<string, CityData> {
+  const next: Record<string, CityData> = {};
+  for (const [cityId, city] of Object.entries(data)) {
+    const nextAssessments: Record<number, AssessmentYear> = {};
+    for (const [yearKey, assess] of Object.entries(city.assessments)) {
+      const year = Number(yearKey);
+      let merged = assess;
+      const remoteLogs = auditLogs[cityId]?.[year];
+      if (remoteLogs && remoteLogs.length > 0) {
+        const existingIds = new Set<string>();
+        for (const log of assess.auditLog) {
+          for (const e of log.entries) existingIds.add(e.id);
+        }
+        const mergedLogs = [...assess.auditLog];
+        for (const remoteLog of remoteLogs) {
+          const unseen = remoteLog.entries.filter((e) => !existingIds.has(e.id));
+          if (unseen.length === 0) continue;
+          const existing = mergedLogs.find(
+            (l) => l.indicatorId === remoteLog.indicatorId
+          );
+          if (existing) {
+            existing.entries.push(...unseen);
+          } else {
+            mergedLogs.push({ ...remoteLog, entries: unseen });
+          }
+        }
+        merged = { ...assess, auditLog: mergedLogs };
+      }
+      nextAssessments[year] = merged;
+    }
+    next[cityId] = { ...city, assessments: nextAssessments };
+  }
+  return next;
 }
 
 function mergeDataSources(
@@ -294,10 +479,19 @@ export function useGRMEData(
       const apiData = await api.loadAssessments();
       const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
       const localData = loadAllData();
-      const merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
+      // Server is source of truth; local fills gaps (cities/years not in Supabase)
+      let merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
+
+      const auditLogs = await api.loadAuditLogsForAssessment();
+      merged = mergeAuditLogsIntoData(merged, auditLogs);
+
+      // Overlay pending offline mutations so they still display before syncing
+      merged = applyPendingMutationsToData(merged);
+
       setAllData(merged);
       saveAllData(merged);
       setApiAvailable(true);
+      await drainQueue();
     } catch {
       setApiAvailable(false);
     }
@@ -336,16 +530,24 @@ export function useGRMEData(
         if (!cancelled) {
           const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
           const localData = loadAllData();
-          const merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
+          let merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
+
+          const auditLogs = await api.loadAuditLogsForAssessment();
+          merged = mergeAuditLogsIntoData(merged, auditLogs);
+
+          merged = applyPendingMutationsToData(merged);
+
           setAllData(merged);
           saveAllData(merged);
           setApiAvailable(true);
+          await drainQueue();
         }
       } catch {
         if (!cancelled) {
           const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
-          saveAllData(localData);
-          setAllData(localData);
+          const withPending = applyPendingMutationsToData(localData);
+          saveAllData(withPending);
+          setAllData(withPending);
           setApiAvailable(false);
         }
       }
@@ -454,6 +656,14 @@ export function useGRMEData(
 
       if (apiAvailable) {
         await api.saveAssessments(selectedCity, year, indicators);
+      } else {
+        enqueueMutation({
+          id: generateId(),
+          type: "createYear",
+          cityId: selectedCity,
+          year,
+          indicators,
+        });
       }
     },
     [selectedCity, ensureCity, apiAvailable]
@@ -483,6 +693,13 @@ export function useGRMEData(
 
       if (apiAvailable) {
         await api.deleteYear(selectedCity, year);
+      } else {
+        enqueueMutation({
+          id: generateId(),
+          type: "deleteYear",
+          cityId: selectedCity,
+          year,
+        });
       }
     },
     [selectedCity, ensureCity, apiAvailable]
@@ -572,6 +789,23 @@ export function useGRMEData(
       if (apiAvailable) {
         await api.saveAssessment(selectedCity, currentYear, indicatorId, indicatorData);
         await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
+      } else {
+        enqueueMutation({
+          id: generateId(),
+          type: "saveIndicator",
+          cityId: selectedCity,
+          year: currentYear,
+          indicatorId,
+          data: indicatorData,
+        });
+        enqueueMutation({
+          id: generateId(),
+          type: "addAuditEntry",
+          cityId: selectedCity,
+          year: currentYear,
+          indicatorId,
+          entry: auditEntry,
+        });
       }
     },
     [selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
@@ -641,6 +875,15 @@ export function useGRMEData(
 
       if (apiAvailable) {
         await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
+      } else {
+        enqueueMutation({
+          id: generateId(),
+          type: "addAuditEntry",
+          cityId: selectedCity,
+          year: currentYear,
+          indicatorId,
+          entry: auditEntry,
+        });
       }
     },
     [selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
