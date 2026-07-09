@@ -6,10 +6,10 @@ import {
   DataType,
   Direction,
   Benchmark,
-  DEFAULT_DOMAINS,
   deepClone,
 } from "./grme-data";
 import * as api from "./grme-api";
+import { DEFAULT_DOMAINS } from "./grme-framework-defaults";
 
 // ── Proposal Types ──────────────────────────────────────────────
 
