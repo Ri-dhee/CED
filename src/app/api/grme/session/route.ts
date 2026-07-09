@@ -6,7 +6,42 @@ import { GRME_SESSION_COOKIE, getSessionSecret, GrmeSessionUser } from "@/lib/gr
 import { UserRole } from "@/lib/grme-user";
 import { hasSupabaseConfig } from "@/lib/supabase";
 
-const BCRYPT_ROUNDS = 12;
+// ── Rate limiter (in-memory, best-effort across serverless instances) ──
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOGIN_MAX_ATTEMPTS = 10;
+
+const attemptStore = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimit(ip: string): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  let entry = attemptStore.get(ip);
+
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+    attemptStore.set(ip, entry);
+  }
+
+  entry.count++;
+  const remaining = Math.max(0, LOGIN_MAX_ATTEMPTS - entry.count);
+
+  // Periodic cleanup
+  if (attemptStore.size > 10000) {
+    for (const [key, val] of attemptStore) {
+      if (now >= val.resetAt) attemptStore.delete(key);
+    }
+  }
+
+  return { allowed: entry.count <= LOGIN_MAX_ATTEMPTS, remaining, resetAt: entry.resetAt };
+}
+
+function getClientIP(request: Request): string {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+         request.headers.get("x-real-ip") ||
+         "127.0.0.1";
+}
+
+// ── Session helpers ──────────────────────────────────────────────
 
 function sign(payload: string): string {
   return createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
@@ -52,7 +87,6 @@ async function verifyLogin(
   const normalizedName = name.trim();
   if (!normalizedName) return null;
 
-  // Admin: compare against server-only bcrypt hash
   if (role === "admin") {
     const expected = process.env.ADMIN_PASSWORD_HASH || "";
     if (!expected || !password) return null;
@@ -75,24 +109,27 @@ async function verifyLogin(
     return { name: found.name, role: found.role, loginAt: new Date().toISOString() };
   }
 
-  if (users.length === 0) {
-    return { name: normalizedName, role, loginAt: new Date().toISOString() };
-  }
-
   return null;
 }
 
+// ── Route handlers ───────────────────────────────────────────────
+
 export async function GET(request: Request) {
   const user = getExistingSession(request);
-
-  if (!user) {
-    return NextResponse.json({ user: null });
-  }
-
-  return NextResponse.json({ user });
+  return NextResponse.json({ user: user || null });
 }
 
 export async function POST(request: Request) {
+  const ip = getClientIP(request);
+  const { allowed, remaining, resetAt } = rateLimit(ip);
+
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Try again later.", remaining, resetAt },
+      { status: 429 }
+    );
+  }
+
   const existingSession = getExistingSession(request);
   const body = await request.json().catch(() => ({}));
   const name = String(body.name || "");
