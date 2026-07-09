@@ -1056,6 +1056,14 @@ function PublicDashboard({
       y: paddingY + usableHeight - (entry.score / 100) * usableHeight,
     }));
   }, [trendData]);
+  const trendAreaPoints = useMemo(() => {
+    if (chartPoints.length < 2) return "";
+    const baselineY = 200;
+    return [
+      ...chartPoints.map((p) => `${p.x},${p.y}`),
+      ...[...chartPoints].reverse().map((p) => `${p.x},${baselineY}`),
+    ].join(" ");
+  }, [chartPoints]);
 
   const topDomains = useMemo(() => {
     return [...framework.domains]
@@ -1133,7 +1141,9 @@ function PublicDashboard({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+        <div className="relative overflow-hidden lg:col-span-4 rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-center text-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <div className="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-cyan-400/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-fuchsia-500/15 blur-3xl" />
           <AnimatedScore
             score={overallScore}
             previousScore={previousOverall}
@@ -1143,41 +1153,54 @@ function PublicDashboard({
             showTrend
           />
           <div className="mt-4 space-y-1">
-            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: `${overallColor}12`, color: overallColor }}>
+            <div className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold backdrop-blur" style={{ color: overallColor }}>
               {overallStatus}
             </div>
-            <div className="text-sm font-medium text-gray-700">{statusCopy}</div>
-            <div className="text-xs text-gray-500">Data completeness {stats.confidence}%</div>
+            <div className="text-sm font-medium text-white/85">{statusCopy}</div>
+            <div className="text-xs text-white/60">Data completeness {stats.confidence}%</div>
           </div>
         </div>
 
-        <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="lg:col-span-8 rounded-[2rem] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Simple Trend</h2>
-              <p className="text-xs text-gray-500">Overall score over time</p>
+              <h2 className="text-sm font-bold uppercase tracking-[0.22em] text-slate-900">Simple Trend</h2>
+              <p className="text-xs text-slate-500">Overall score over time</p>
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500">
               {availableYears.length} year{availableYears.length === 1 ? "" : "s"}
             </div>
           </div>
           {trendData.length > 0 ? (
-            <div className="h-56 w-full">
+            <div className="h-56 w-full rounded-2xl bg-gradient-to-b from-slate-50 to-white p-2">
               <svg viewBox="0 0 600 220" className="h-full w-full" role="img" aria-label="Overall score trend">
                 {Array.from({ length: 5 }, (_, i) => {
                   const y = 20 + (180 / 4) * i;
                   const value = 100 - i * 25;
                   return (
                     <g key={value}>
-                      <line x1="24" y1={y} x2="576" y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />
+                      <line x1="24" y1={y} x2="576" y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />
                       <text x="10" y={y + 4} fontSize="10" fill="#9ca3af">{value}</text>
                     </g>
                   );
                 })}
+                {trendAreaPoints && (
+                  <polygon
+                    points={trendAreaPoints}
+                    fill="url(#trendGradient)"
+                    opacity="0.7"
+                  />
+                )}
+                <defs>
+                  <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
                 {chartPoints.length > 1 && (
                   <polyline
                     fill="none"
-                    stroke="#6366f1"
+                    stroke="#4f46e5"
                     strokeWidth="3"
                     strokeLinejoin="round"
                     strokeLinecap="round"
@@ -1186,9 +1209,9 @@ function PublicDashboard({
                 )}
                 {chartPoints.map((point) => (
                   <g key={point.year}>
-                    <circle cx={point.x} cy={point.y} r="5" fill="#fff" stroke="#6366f1" strokeWidth="3" />
-                    <text x={point.x} y="206" textAnchor="middle" fontSize="11" fill="#6b7280">{point.year}</text>
-                    <text x={point.x} y={Math.max(16, point.y - 10)} textAnchor="middle" fontSize="11" fill="#111827" fontWeight="600">{point.score}</text>
+                    <circle cx={point.x} cy={point.y} r="5" fill="#fff" stroke="#4f46e5" strokeWidth="3" />
+                    <text x={point.x} y="206" textAnchor="middle" fontSize="11" fill="#64748b">{point.year}</text>
+                    <text x={point.x} y={Math.max(16, point.y - 10)} textAnchor="middle" fontSize="11" fill="#0f172a" fontWeight="700">{point.score}</text>
                   </g>
                 ))}
               </svg>
@@ -1204,55 +1227,55 @@ function PublicDashboard({
         </div>
       </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Strongest area</div>
-          <div className="mt-2 text-sm font-bold text-gray-900">{strongest ? cleanLabel(strongest.domain.shortName) : "No data"}</div>
-          <div className="text-xs text-gray-500">{strongest ? `${Math.round(strongest.score)} points` : "Enter data to rank areas"}</div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 shadow-sm ring-1 ring-sky-100/60">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-500">Strongest area</div>
+          <div className="mt-2 text-sm font-bold text-slate-900">{strongest ? cleanLabel(strongest.domain.shortName) : "No data"}</div>
+          <div className="mt-1 text-xs text-slate-500">{strongest ? `${Math.round(strongest.score)} points` : "Enter data to rank areas"}</div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Needs attention</div>
-          <div className="mt-2 text-sm font-bold text-gray-900">{weakest ? cleanLabel(weakest.domain.shortName) : "No data"}</div>
-          <div className="text-xs text-gray-500">{weakest ? `${Math.round(weakest.score)} points` : "Enter data to identify gaps"}</div>
+        <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-white p-4 shadow-sm ring-1 ring-rose-100/60">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-rose-500">Needs attention</div>
+          <div className="mt-2 text-sm font-bold text-slate-900">{weakest ? cleanLabel(weakest.domain.shortName) : "No data"}</div>
+          <div className="mt-1 text-xs text-slate-500">{weakest ? `${Math.round(weakest.score)} points` : "Enter data to identify gaps"}</div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Data completeness</div>
-          <div className="mt-2 text-sm font-bold text-gray-900">{stats.filled}/{stats.total}</div>
-          <div className="text-xs text-gray-500">{stats.percentage}% of indicators filled</div>
+        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-sm ring-1 ring-emerald-100/60">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-500">Data completeness</div>
+          <div className="mt-2 text-sm font-bold text-slate-900">{stats.filled}/{stats.total}</div>
+          <div className="mt-1 text-xs text-slate-500">{stats.percentage}% of indicators filled</div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Year-over-year</div>
-          <div className="mt-2 text-sm font-bold text-gray-900">{overallChange === null ? "Add a prior year" : `${overallChange > 0 ? "+" : ""}${overallChange} pts`}</div>
-          <div className="text-xs text-gray-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Shown after a second year is added"}</div>
+        <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-white p-4 shadow-sm ring-1 ring-violet-100/60">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-500">Year-over-year</div>
+          <div className="mt-2 text-sm font-bold text-slate-900">{overallChange === null ? "Add a prior year" : `${overallChange > 0 ? "+" : ""}${overallChange} pts`}</div>
+          <div className="mt-1 text-xs text-slate-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Shown after a second year is added"}</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">What to Know</h2>
-            <p className="text-xs text-gray-500">Three plain-language takeaways from the dashboard</p>
+            <h2 className="text-sm font-bold uppercase tracking-[0.22em] text-slate-900">What to Know</h2>
+            <p className="text-xs text-slate-500">Three plain-language takeaways from the dashboard</p>
           </div>
           <button
             type="button"
             onClick={() => setShowDetails((v) => !v)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            className="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-slate-900/15 transition-colors hover:bg-slate-800"
           >
             {showDetails ? "Hide details" : "View details"}
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-xl bg-gray-50 p-4">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Summary</div>
-            <div className="mt-2 text-sm text-gray-700">{statusCopy}.</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Summary</div>
+            <div className="mt-2 text-sm text-slate-700">{statusCopy}.</div>
           </div>
-          <div className="rounded-xl bg-gray-50 p-4">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Improvement</div>
-            <div className="mt-2 text-sm text-gray-700">{overallChange !== null && overallChange > 0 ? `The score is up by ${overallChange} points since ${previousYear}.` : "Add another year to see whether performance is improving."}</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Improvement</div>
+            <div className="mt-2 text-sm text-slate-700">{overallChange !== null && overallChange > 0 ? `The score is up by ${overallChange} points since ${previousYear}.` : "Add another year to see whether performance is improving."}</div>
           </div>
-          <div className="rounded-xl bg-gray-50 p-4">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Coverage</div>
-            <div className="mt-2 text-sm text-gray-700">{stats.confidence >= 80 ? "Data is mostly complete." : "Some areas are still being verified."}</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Coverage</div>
+            <div className="mt-2 text-sm text-slate-700">{stats.confidence >= 80 ? "Data is mostly complete." : "Some areas are still being verified."}</div>
           </div>
         </div>
       </div>
@@ -1260,8 +1283,8 @@ function PublicDashboard({
       {showDetails && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Domain Profile</h3>
+            <div className="lg:col-span-5 rounded-[2rem] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.22em] text-slate-900">Domain Profile</h3>
               {framework.domains.length > 0 ? (
                 <RadarChart
                   domains={framework.domains}
@@ -1270,17 +1293,17 @@ function PublicDashboard({
                   size={320}
                 />
               ) : (
-                <div className="h-64 flex items-center justify-center text-sm text-gray-400">No framework yet</div>
+                <div className="flex h-64 items-center justify-center text-sm text-slate-400">No framework yet</div>
               )}
             </div>
-            <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="lg:col-span-7 rounded-[2rem] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
               <div className="flex flex-col gap-3 mb-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Year-over-Year Comparison</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-[0.22em] text-slate-900">Year-over-Year Comparison</h3>
                   <select
                     value={comparisonMode}
                     onChange={(e) => setComparisonMode(e.target.value as typeof comparisonMode)}
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm outline-none transition focus:border-indigo-300 focus:bg-white"
                   >
                     <option value="previous">Previous year</option>
                     <option value="pick">Pick year</option>
@@ -1288,8 +1311,8 @@ function PublicDashboard({
                   </select>
                 </div>
                 {comparisonMode !== "previous" && availableComparisonYears.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                    <span className="text-gray-400">Choose year(s):</span>
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-[11px] text-slate-500">
+                    <span className="text-slate-400">Choose year(s):</span>
                     {availableComparisonYears.map((year) => {
                       const active = activeComparisonYears.includes(year);
                       return (
@@ -1297,10 +1320,10 @@ function PublicDashboard({
                           key={year}
                           type="button"
                           onClick={() => toggleComparisonYear(year)}
-                          className={`rounded-full border px-2.5 py-1 font-medium transition-colors ${
+                          className={`rounded-full border px-3 py-1.5 font-semibold transition-all ${
                             active
-                              ? "border-primary bg-primary text-white"
-                              : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                              ? "border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                           }`}
                         >
                           {year}
@@ -1311,7 +1334,7 @@ function PublicDashboard({
                       <button
                         type="button"
                         onClick={() => setComparisonYears([])}
-                        className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 font-medium text-gray-500 hover:bg-gray-100"
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-500 hover:bg-slate-100"
                       >
                         Clear
                       </button>
@@ -1338,13 +1361,13 @@ function PublicDashboard({
                   />
                 )
               ) : (
-                <div className="h-64 flex items-center justify-center text-sm text-gray-400">Add another year to compare domains</div>
+                <div className="flex h-64 items-center justify-center text-sm text-slate-400">Add another year to compare domains</div>
               )}
             </div>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">How scoring works</h3>
-            <p className="text-sm text-gray-600 leading-6">
+          <div className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-[0.22em] text-slate-900">How scoring works</h3>
+            <p className="text-sm leading-6 text-slate-600">
               Scores combine the underlying indicator values into one public summary. The goal is to show progress clearly without exposing the full analyst view.
             </p>
           </div>
