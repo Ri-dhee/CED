@@ -128,15 +128,37 @@ export async function deleteYear(
 
 // ── Audit Log ────────────────────────────────────────────────────
 
-export async function loadAuditLog(): Promise<Record<string, unknown>[]> {
-  const { data, error } = await supabase()
+export async function loadAuditLog(
+  page: number = 0,
+  pageSize: number = 500
+): Promise<{ entries: Record<string, unknown>[]; total: number | null }> {
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await supabase()
     .from("audit_log")
-    .select("*")
+    .select("*", { count: "estimated" })
     .order("timestamp", { ascending: false })
-    .limit(5000);
+    .range(from, to);
 
   if (error) throw error;
-  return data || [];
+  return { entries: data || [], total: count };
+}
+
+export async function loadAllAuditLogEntries(): Promise<Record<string, unknown>[]> {
+  const PAGE_SIZE = 1000;
+  let all: Record<string, unknown>[] = [];
+  let page = 0;
+  let fetched: Record<string, unknown>[];
+
+  do {
+    const { entries } = await loadAuditLog(page, PAGE_SIZE);
+    fetched = entries;
+    all = all.concat(fetched);
+    page++;
+  } while (fetched.length === PAGE_SIZE);
+
+  return all;
 }
 
 export async function addAuditEntry(

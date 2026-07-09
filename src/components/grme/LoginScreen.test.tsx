@@ -68,27 +68,6 @@ describe("LoginScreen", () => {
     expect(screen.getByText(/admin password is required/i)).toBeInTheDocument();
   });
 
-  // ── Bootstrap path (no managed users) ─────────────────────
-
-  it("calls onLogin with name and role when no managed users exist", async () => {
-    const { onLogin } = renderLogin();
-    await userEvent.type(getNameInput(), "Alice");
-    await userEvent.click(getSubmitButton());
-    await waitFor(() => {
-      expect(onLogin).toHaveBeenCalledWith("Alice", "viewer");
-    });
-  });
-
-  it("passes the selected role in bootstrap mode", async () => {
-    const { onLogin } = renderLogin();
-    await userEvent.type(getNameInput(), "Bob");
-    await userEvent.click(screen.getByRole("radio", { name: /editor/i }));
-    await userEvent.click(getSubmitButton());
-    await waitFor(() => {
-      expect(onLogin).toHaveBeenCalledWith("Bob", "editor");
-    });
-  });
-
   // ── Admin path ────────────────────────────────────────────
 
   it("requires admin password and passes it to onLogin", async () => {
@@ -168,12 +147,14 @@ describe("LoginScreen", () => {
     expect(onLogin).not.toHaveBeenCalled();
   });
 
-  // ── Error display ─────────────────────────────────────────
+  // ── Error display (admin path) ────────────────────────────
 
-  it("displays error message when onLogin fails", async () => {
+  it("displays error message when admin onLogin fails", async () => {
     const { onLogin } = renderLogin();
     onLogin.mockResolvedValue({ success: false, error: "Bad credentials" });
-    await userEvent.type(getNameInput(), "Alice");
+    await userEvent.type(getNameInput(), "Admin");
+    await userEvent.click(screen.getByRole("radio", { name: /admin/i }));
+    await userEvent.type(getAdminPasswordInput(), "wrong");
     await userEvent.click(getSubmitButton());
     await waitFor(() => {
       expect(screen.getByText(/bad credentials/i)).toBeInTheDocument();
@@ -183,24 +164,27 @@ describe("LoginScreen", () => {
   it("clears error when name is changed", async () => {
     const { onLogin } = renderLogin();
     onLogin.mockResolvedValue({ success: false, error: "Wrong password" });
-    await userEvent.type(getNameInput(), "Tester");
+    await userEvent.type(getNameInput(), "Admin");
+    await userEvent.click(screen.getByRole("radio", { name: /admin/i }));
+    await userEvent.type(getAdminPasswordInput(), "wrong");
     await userEvent.click(getSubmitButton());
     await waitFor(() => {
       expect(screen.getByText(/wrong password/i)).toBeInTheDocument();
     });
-    // Changing the name should clear the error
     await userEvent.clear(getNameInput());
-    await userEvent.type(getNameInput(), "NewName");
+    await userEvent.type(getNameInput(), "NewAdmin");
     expect(screen.queryByText(/wrong password/i)).not.toBeInTheDocument();
   });
 
-  // ── Loading state ─────────────────────────────────────────
+  // ── Loading state (admin path) ────────────────────────────
 
   it("shows 'Verifying...' while login is in progress", async () => {
     const { onLogin } = renderLogin();
     let resolveLogin: (value: unknown) => void;
     onLogin.mockReturnValue(new Promise((resolve) => { resolveLogin = resolve; }));
     await userEvent.type(getNameInput(), "Charlie");
+    await userEvent.click(screen.getByRole("radio", { name: /admin/i }));
+    await userEvent.type(getAdminPasswordInput(), "pwd");
     await userEvent.click(getSubmitButton());
     expect(screen.getByText(/verifying\.\.\./i)).toBeInTheDocument();
     resolveLogin!({ success: true });
@@ -209,17 +193,9 @@ describe("LoginScreen", () => {
     });
   });
 
-  // ── First-time vs returning info text ─────────────────────
+  // ── Info text ─────────────────────────────────────────────
 
-  it("shows first-time message when no managed users exist", () => {
-    renderLogin();
-    expect(screen.getByText(/first time/i)).toBeInTheDocument();
-  });
-
-  it("shows contact-admin message when managed users exist", () => {
-    mockManagedUsers = [
-      { id: "u1", name: "Admin", role: "admin", active: true },
-    ];
+  it("shows contact-admin message", () => {
     renderLogin();
     expect(screen.getByText(/contact your administrator/i)).toBeInTheDocument();
   });

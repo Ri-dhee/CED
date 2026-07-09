@@ -71,17 +71,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       return;
     }
 
-    // Non-managed user (bootstrap mode — no managed users yet)
-    if (managedUsers.length === 0) {
-      setLoading(true);
-      const result = await onLogin(name.trim(), selectedRole);
-      setLoading(false);
-      if (!result.success) {
-        setError(result.error || "Login failed");
-      }
-      return;
-    }
-
     // User not found in managed users
     setError("User not found. Contact admin to create your account.");
   };
@@ -268,9 +257,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         </form>
 
         <p className="text-center text-[10px] text-gray-400 mt-4">
-          {managedUsers.length > 0
-            ? "Contact your administrator for account access."
-            : "First time? Enter your name and role to get started."}
+          Contact your administrator for account access.
         </p>
       </div>
     </div>

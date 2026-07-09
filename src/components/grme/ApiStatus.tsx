@@ -20,7 +20,8 @@ interface SyncContextValue {
   };
   entries: SyncEntry[];
   hasErrors: boolean;
-  retryAll: () => void;
+  retryAll: () => Promise<void>;
+  onRetryAll: (handler: () => Promise<void>) => void;
   lastVerifiedAt: number | null;
 }
 
@@ -38,6 +39,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<SyncEntry[]>([]);
   const [lastVerifiedAt, setLastVerifiedAt] = useState<number | null>(null);
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const retryHandlerRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  const onRetryAll = useCallback((handler: () => Promise<void>) => {
+    retryHandlerRef.current = handler;
+  }, []);
 
   const trackSync = useCallback((id: string) => {
     // Mark as saving
@@ -84,15 +90,19 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const retryAll = useCallback(() => {
-    // This will be called by children to retry failed syncs
-    setEntries((prev) => prev.filter((e) => e.status !== "error"));
-  }, []);
+  const retryAll = useCallback(async () => {
+    const failedIds = entries.filter((e) => e.status === "error").map((e) => e.id);
+    if (failedIds.length === 0) return;
+    setEntries((prev) => prev.map((e) =>
+      failedIds.includes(e.id) ? { ...e, status: "saving" as SyncStatus } : e
+    ));
+    await retryHandlerRef.current();
+  }, [entries]);
 
   const hasErrors = entries.some((e) => e.status === "error");
 
   return (
-    <SyncContext.Provider value={{ trackSync, entries, hasErrors, retryAll, lastVerifiedAt }}>
+    <SyncContext.Provider value={{ trackSync, entries, hasErrors, retryAll, onRetryAll, lastVerifiedAt }}>
       {children}
     </SyncContext.Provider>
   );

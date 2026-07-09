@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   CITIES,
   getStatusFromScore,
@@ -70,7 +70,7 @@ function GRMEApp({
   onLogout: () => void;
 }) {
   const framework = useGRMEFramework();
-  const { trackSync } = useSync();
+  const { trackSync, onRetryAll } = useSync();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [overlayMode, setOverlayMode] = useState<"auto" | "specific" | "all">("auto");
@@ -96,6 +96,11 @@ function GRMEApp({
     apiAvailable,
     refreshData,
   } = useGRMEData(framework.domains, user.name, selectedYear);
+
+  // Wire retryAll to refresh data (must be after useGRMEData so refreshData is defined)
+  useEffect(() => {
+    onRetryAll(async () => { refreshData(); });
+  }, [onRetryAll, refreshData]);
 
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [selectedDomain, setSelectedDomain] = useState<string>(

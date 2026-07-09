@@ -59,7 +59,7 @@ vi.mock("@/lib/grme-store", () => ({
 vi.mock("@/components/grme/ApiStatus", () => ({
   default: () => null,
   SyncProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useSync: () => ({ trackSync: () => ({ onSuccess: vi.fn(), onError: vi.fn() }) }),
+  useSync: () => ({ trackSync: () => ({ onSuccess: vi.fn(), onError: vi.fn() }), onRetryAll: vi.fn(), retryAll: vi.fn() }),
 }));
 
 vi.mock("@/components/grme/RadarChart", () => ({ default: () => null }));
