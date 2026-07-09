@@ -5,6 +5,7 @@ import {
   getStatusFromScore,
   getStatusColor,
   areYearsComparable,
+  Domain,
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
@@ -252,6 +253,7 @@ function GRMEApp({
   );
   const overallStatus = getStatusFromScore(overallScore);
   const overallColor = getStatusColor(overallStatus);
+  const isPublicView = user.role === "viewer";
   const methodologyNotes = framework.domains
     .map((d) => d.methodologyNote)
     .filter((note): note is string => Boolean(note && note.trim()));
@@ -434,7 +436,16 @@ function GRMEApp({
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex gap-2 flex-wrap" role="tablist" aria-label="GRME sections">
-            {([
+            {((isPublicView
+              ? [
+                  {
+                    id: "dashboard",
+                    label: "Dashboard",
+                    icon: "M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z",
+                    show: true,
+                  },
+                ]
+              : [
               {
                 id: "dashboard",
                 label: "Dashboard",
@@ -457,9 +468,9 @@ function GRMEApp({
                 id: "audit",
                 label: "Audit Trail",
                 icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-                show: true,
+                show: !isPublicView,
               },
-            ] as const)
+            ] as const))
               .filter((t) => t.show)
               .map((tab) => (
                 <button
@@ -468,7 +479,7 @@ function GRMEApp({
                   aria-selected={activeTab === tab.id}
                   aria-controls={`panel-${tab.id}`}
                   id={`tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id as Tab)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     activeTab === tab.id
                       ? "bg-primary text-white shadow-lg shadow-primary/25"
@@ -505,7 +516,24 @@ function GRMEApp({
       {activeTab === "dashboard" && (
         <section className="pb-12" role="tabpanel" id="panel-dashboard" aria-labelledby="tab-dashboard">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-
+            {isPublicView ? (
+              <PublicDashboard
+                framework={framework}
+                availableYears={availableYears}
+                selectedYear={selectedYear}
+                previousYear={previousYear}
+                overallScore={overallScore}
+                overallStatus={overallStatus}
+                overallColor={overallColor}
+                stats={stats}
+                getDomainScore={getDomainScore}
+                getDomainScoreForYear={getDomainScoreForYear}
+                getScoreForYear={getScoreForYear}
+                comparabilityWarning={comparabilityWarning}
+              />
+            ) : (
+              <>
+            
             {/* ═══ HERO ROW: Animated Score + Radar + Data Quality ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -774,6 +802,8 @@ function GRMEApp({
                 />
               </div>
             )}
+              </>
+            )}
           </div>
         </section>
       )}
@@ -969,6 +999,273 @@ function GRMEApp({
       {/* User Management Modal */}
       {showUserManagement && isAdmin && (
         <UserManagement onClose={() => setShowUserManagement(false)} />
+      )}
+    </div>
+  );
+}
+
+function PublicDashboard({
+  framework,
+  availableYears,
+  selectedYear,
+  previousYear,
+  overallScore,
+  overallStatus,
+  overallColor,
+  stats,
+  getDomainScore,
+  getDomainScoreForYear,
+  getScoreForYear,
+  comparabilityWarning,
+}: {
+  framework: { domains: Domain[] };
+  availableYears: number[];
+  selectedYear: number;
+  previousYear: number | null;
+  overallScore: number;
+  overallStatus: ReturnType<typeof getStatusFromScore>;
+  overallColor: string;
+  stats: { filled: number; total: number; missing: number; percentage: number; confidence: number };
+  getDomainScore: (domainId: string) => number;
+  getDomainScoreForYear: (domainId: string, year: number) => number;
+  getScoreForYear: (year: number) => number;
+  comparabilityWarning: string | null;
+}) {
+  const [showDetails, setShowDetails] = useState(false);
+  const trendData = useMemo(
+    () =>
+      [...availableYears]
+        .sort((a, b) => a - b)
+        .map((year) => ({ year: String(year), score: Math.round(getScoreForYear(year)) })),
+    [availableYears, getScoreForYear]
+  );
+  const chartPoints = useMemo(() => {
+    if (trendData.length === 0) return [];
+    const width = 600;
+    const height = 220;
+    const paddingX = 24;
+    const paddingY = 20;
+    const usableWidth = width - paddingX * 2;
+    const usableHeight = height - paddingY * 2;
+    const step = trendData.length > 1 ? usableWidth / (trendData.length - 1) : 0;
+    return trendData.map((entry, index) => ({
+      ...entry,
+      x: paddingX + index * step,
+      y: paddingY + usableHeight - (entry.score / 100) * usableHeight,
+    }));
+  }, [trendData]);
+
+  const topDomains = useMemo(() => {
+    return [...framework.domains]
+      .map((domain) => ({
+        domain,
+        score: getDomainScore(domain.id),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }, [framework.domains, getDomainScore]);
+
+  const strongest = topDomains[0];
+  const weakest = [...topDomains].sort((a, b) => a.score - b.score)[0];
+  const previousOverall = previousYear ? getScoreForYear(previousYear) : null;
+  const overallChange = previousOverall === null ? null : Math.round(overallScore - previousOverall);
+  const comparisonDomainScores = previousYear
+    ? Object.fromEntries(
+        framework.domains.map((domain) => [domain.id, getDomainScoreForYear(domain.id, previousYear)])
+      )
+    : null;
+  const statusCopy =
+    overallStatus === "Exemplary"
+      ? "Strong overall performance"
+      : overallStatus === "Progressive"
+        ? "Moving in the right direction"
+        : overallStatus === "Developing"
+          ? "Needs steady improvement"
+          : "Needs urgent attention";
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+          <AnimatedScore
+            score={overallScore}
+            previousScore={previousOverall}
+            confidence={stats.confidence}
+            size="xl"
+            showGrade
+            showTrend
+          />
+          <div className="mt-4 space-y-1">
+            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: `${overallColor}12`, color: overallColor }}>
+              {overallStatus}
+            </div>
+            <div className="text-sm font-medium text-gray-700">{statusCopy}</div>
+            <div className="text-xs text-gray-500">Data completeness {stats.confidence}%</div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Simple Trend</h2>
+              <p className="text-xs text-gray-500">Overall score over time</p>
+            </div>
+            <div className="text-xs text-gray-500">
+              {availableYears.length} year{availableYears.length === 1 ? "" : "s"}
+            </div>
+          </div>
+          {trendData.length > 0 ? (
+            <div className="h-56 w-full">
+              <svg viewBox="0 0 600 220" className="h-full w-full" role="img" aria-label="Overall score trend">
+                {Array.from({ length: 5 }, (_, i) => {
+                  const y = 20 + (180 / 4) * i;
+                  const value = 100 - i * 25;
+                  return (
+                    <g key={value}>
+                      <line x1="24" y1={y} x2="576" y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />
+                      <text x="10" y={y + 4} fontSize="10" fill="#9ca3af">{value}</text>
+                    </g>
+                  );
+                })}
+                {chartPoints.length > 1 && (
+                  <polyline
+                    fill="none"
+                    stroke="#6366f1"
+                    strokeWidth="3"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    points={chartPoints.map((p) => `${p.x},${p.y}`).join(" ")}
+                  />
+                )}
+                {chartPoints.map((point) => (
+                  <g key={point.year}>
+                    <circle cx={point.x} cy={point.y} r="5" fill="#fff" stroke="#6366f1" strokeWidth="3" />
+                    <text x={point.x} y="206" textAnchor="middle" fontSize="11" fill="#6b7280">{point.year}</text>
+                    <text x={point.x} y={Math.max(16, point.y - 10)} textAnchor="middle" fontSize="11" fill="#111827" fontWeight="600">{point.score}</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          ) : (
+            <div className="h-56 flex items-center justify-center text-sm text-gray-400">Add at least one year to see the trend</div>
+          )}
+          {previousOverall !== null && (
+            <div className="mt-3 text-xs text-gray-500">
+              Year-over-year change: <span className={`font-semibold ${overallChange && overallChange > 0 ? "text-green-600" : overallChange && overallChange < 0 ? "text-red-500" : "text-gray-500"}`}>{overallChange && overallChange > 0 ? "+" : ""}{overallChange ?? 0} pts</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Strongest area</div>
+          <div className="mt-2 text-sm font-bold text-gray-900">{strongest?.domain.shortName || "No data"}</div>
+          <div className="text-xs text-gray-500">{strongest ? `${Math.round(strongest.score)} points` : "Enter data to rank areas"}</div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Needs attention</div>
+          <div className="mt-2 text-sm font-bold text-gray-900">{weakest?.domain.shortName || "No data"}</div>
+          <div className="text-xs text-gray-500">{weakest ? `${Math.round(weakest.score)} points` : "Enter data to identify gaps"}</div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Data completeness</div>
+          <div className="mt-2 text-sm font-bold text-gray-900">{stats.filled}/{stats.total}</div>
+          <div className="text-xs text-gray-500">{stats.percentage}% of indicators filled</div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Year-over-year</div>
+          <div className="mt-2 text-sm font-bold text-gray-900">{overallChange === null ? "Add a prior year" : `${overallChange > 0 ? "+" : ""}${overallChange} pts`}</div>
+          <div className="text-xs text-gray-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Comparison appears after a second year is added"}</div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">What to Know</h2>
+            <p className="text-xs text-gray-500">Three plain-language takeaways from the dashboard</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            {showDetails ? "Hide details" : "View details"}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-xl bg-gray-50 p-4">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Summary</div>
+            <div className="mt-2 text-sm text-gray-700">{statusCopy}.</div>
+          </div>
+          <div className="rounded-xl bg-gray-50 p-4">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Improvement</div>
+            <div className="mt-2 text-sm text-gray-700">{overallChange !== null && overallChange > 0 ? `The score is up by ${overallChange} points since ${previousYear}.` : "Add another year to see whether performance is improving."}</div>
+          </div>
+          <div className="rounded-xl bg-gray-50 p-4">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Coverage</div>
+            <div className="mt-2 text-sm text-gray-700">{stats.confidence >= 80 ? "Data is mostly complete." : "Some areas are still being verified."}</div>
+          </div>
+        </div>
+      </div>
+
+      {showDetails && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Domain Profile</h3>
+              {framework.domains.length > 0 ? (
+                <RadarChart
+                  domains={framework.domains}
+                  getDomainScore={getDomainScore}
+                  comparisonDomainScores={comparisonDomainScores}
+                  size={320}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-sm text-gray-400">No framework yet</div>
+              )}
+            </div>
+            <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Year Comparison</h3>
+              {availableYears.length >= 2 && previousYear ? (
+                <ComparisonView
+                  domains={framework.domains}
+                  currentYear={selectedYear}
+                  previousYear={previousYear}
+                  getCurrentDomainScore={getDomainScore}
+                  getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, previousYear)}
+                  comparabilityWarning={comparabilityWarning}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-sm text-gray-400">Add another year to compare domains</div>
+              )}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">How scoring works</h3>
+            <p className="text-sm text-gray-600 leading-6">
+              Scores combine the underlying indicator values into one public summary. The goal is to show progress clearly without exposing the full analyst view.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {framework.domains.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          {topDomains.map(({ domain, score }) => (
+            <div key={domain.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-semibold text-gray-800 truncate">{domain.shortName}</div>
+                <div className="text-sm font-bold" style={{ color: domain.color }}>{Math.round(score)}</div>
+              </div>
+              <div className="text-[11px] text-gray-500 mb-3">{getStatusFromScore(score)}</div>
+              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, score))}%`, backgroundColor: domain.color }} />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
