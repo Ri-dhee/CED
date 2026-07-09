@@ -1032,6 +1032,8 @@ function PublicDashboard({
   comparabilityWarning: string | null;
 }) {
   const [showDetails, setShowDetails] = useState(false);
+  const [comparisonMode, setComparisonMode] = useState<"previous" | "pick" | "layer">("previous");
+  const [comparisonYears, setComparisonYears] = useState<number[]>(previousYear ? [previousYear] : []);
   const trendData = useMemo(
     () =>
       [...availableYears]
@@ -1082,7 +1084,51 @@ function PublicDashboard({
         ? "Moving in the right direction"
         : overallStatus === "Developing"
           ? "Needs steady improvement"
-          : "Needs urgent attention";
+      : "Needs urgent attention";
+
+  const availableComparisonYears = useMemo(
+    () => availableYears.filter((year) => year !== selectedYear),
+    [availableYears, selectedYear]
+  );
+
+  useEffect(() => {
+    if (comparisonMode === "previous" && previousYear !== null) {
+      setComparisonYears([previousYear]);
+    }
+  }, [comparisonMode, previousYear]);
+
+  const activeComparisonYears =
+    comparisonMode === "previous"
+      ? previousYear !== null
+        ? [previousYear]
+        : []
+      : comparisonYears.length > 0
+        ? comparisonYears
+        : previousYear !== null
+          ? [previousYear]
+          : [];
+
+  const pickedComparisonYear = activeComparisonYears[0] || null;
+  const layeredComparisonSeries = activeComparisonYears.map((year, idx) => ({
+    label: String(year),
+    scores: Object.fromEntries(
+      framework.domains.map((domain) => [domain.id, getDomainScoreForYear(domain.id, year)])
+    ),
+    color: YEAR_COLORS[idx % YEAR_COLORS.length],
+  }));
+
+  const toggleComparisonYear = (year: number) => {
+    if (comparisonMode === "pick") {
+      setComparisonYears([year]);
+      return;
+    }
+
+    setComparisonYears((current) =>
+      current.includes(year)
+        ? current.filter((value) => value !== year)
+        : [...current, year].sort((a, b) => a - b)
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1158,7 +1204,7 @@ function PublicDashboard({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Strongest area</div>
           <div className="mt-2 text-sm font-bold text-gray-900">{strongest ? cleanLabel(strongest.domain.shortName) : "No data"}</div>
@@ -1228,16 +1274,69 @@ function PublicDashboard({
               )}
             </div>
             <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Year Comparison</h3>
-              {availableYears.length >= 2 && previousYear ? (
-                <ComparisonView
-                  domains={framework.domains}
-                  currentYear={selectedYear}
-                  previousYear={previousYear}
-                  getCurrentDomainScore={getDomainScore}
-                  getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, previousYear)}
-                  comparabilityWarning={comparabilityWarning}
-                />
+              <div className="flex flex-col gap-3 mb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Year-over-Year Comparison</h3>
+                  <select
+                    value={comparisonMode}
+                    onChange={(e) => setComparisonMode(e.target.value as typeof comparisonMode)}
+                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
+                  >
+                    <option value="previous">Previous year</option>
+                    <option value="pick">Pick year</option>
+                    <option value="layer">Layer years</option>
+                  </select>
+                </div>
+                {comparisonMode !== "previous" && availableComparisonYears.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                    <span className="text-gray-400">Choose year(s):</span>
+                    {availableComparisonYears.map((year) => {
+                      const active = activeComparisonYears.includes(year);
+                      return (
+                        <button
+                          key={year}
+                          type="button"
+                          onClick={() => toggleComparisonYear(year)}
+                          className={`rounded-full border px-2.5 py-1 font-medium transition-colors ${
+                            active
+                              ? "border-primary bg-primary text-white"
+                              : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                          }`}
+                        >
+                          {year}
+                        </button>
+                      );
+                    })}
+                    {comparisonMode === "layer" && activeComparisonYears.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setComparisonYears([])}
+                        className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 font-medium text-gray-500 hover:bg-gray-100"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {availableYears.length >= 2 && pickedComparisonYear ? (
+                comparisonMode === "layer" ? (
+                  <RadarChart
+                    domains={framework.domains}
+                    getDomainScore={getDomainScore}
+                    comparisonSeries={layeredComparisonSeries}
+                    size={320}
+                  />
+                ) : (
+                  <ComparisonView
+                    domains={framework.domains}
+                    currentYear={selectedYear}
+                    previousYear={pickedComparisonYear}
+                    getCurrentDomainScore={getDomainScore}
+                    getPreviousDomainScore={(domainId) => getDomainScoreForYear(domainId, pickedComparisonYear)}
+                    comparabilityWarning={comparabilityWarning}
+                  />
+                )
               ) : (
                 <div className="h-64 flex items-center justify-center text-sm text-gray-400">Add another year to compare domains</div>
               )}
