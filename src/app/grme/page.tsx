@@ -309,13 +309,13 @@ function GRMEApp({
         </div>
       </section>
 
-      {/* City + Year Selector + Stats Bar + User Badge */}
+      {/* Dzongkhag + Year Selector + Stats Bar + User Badge */}
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row items-center gap-4">
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium text-gray-600">
-                City:
+                Dzongkhag:
               </label>
               <select
                 value={selectedCity}
