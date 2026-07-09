@@ -566,6 +566,9 @@ export function useGRMEData(
   user?: GrmeUser
 ) {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueFlushPromiseRef = useRef<Promise<void> | null>(null);
+  const queueFlushResolveRef = useRef<(() => void) | null>(null);
 
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
@@ -588,6 +591,31 @@ export function useGRMEData(
   useEffect(() => {
     domainsRef.current = domains;
   }, [domains]);
+
+  const scheduleQueueFlush = useCallback(async () => {
+    if (!hasSupabaseConfig || !apiAvailable) return;
+
+    if (!queueFlushPromiseRef.current) {
+      queueFlushPromiseRef.current = new Promise<void>((resolve) => {
+        queueFlushResolveRef.current = resolve;
+      });
+    }
+
+    if (queueFlushTimerRef.current) clearTimeout(queueFlushTimerRef.current);
+    queueFlushTimerRef.current = setTimeout(async () => {
+      try {
+        await drainQueue();
+      } finally {
+        const resolve = queueFlushResolveRef.current;
+        queueFlushResolveRef.current = null;
+        queueFlushPromiseRef.current = null;
+        queueFlushTimerRef.current = null;
+        resolve?.();
+      }
+    }, 900);
+
+    return queueFlushPromiseRef.current;
+  }, [apiAvailable]);
 
   // ── Debounced refresh data from Supabase ───────────────────────
   // Prevents cascading refreshes when multiple mutations fire rapidly.
@@ -637,6 +665,7 @@ export function useGRMEData(
   useEffect(() => {
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      if (queueFlushTimerRef.current) clearTimeout(queueFlushTimerRef.current);
     };
   }, []);
 
@@ -858,20 +887,19 @@ export function useGRMEData(
         return nextData;
       });
 
+      enqueueMutation({
+        id: generateId(),
+        type: "createYear",
+        cityId: activeCityId,
+        year,
+        thromdeId: selectedThromde?.id,
+        indicators,
+      });
       if (apiAvailable) {
-        await api.saveAssessments(activeCityId, year, indicators, selectedThromde?.id);
-      } else {
-        enqueueMutation({
-          id: generateId(),
-          type: "createYear",
-          cityId: activeCityId,
-          year,
-          thromdeId: selectedThromde?.id,
-          indicators,
-        });
+        await scheduleQueueFlush();
       }
     },
-    [activeCityId, ensureCity, apiAvailable, user, selectedThromde]
+    [activeCityId, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Delete year ────────────────────────────────────────────
@@ -905,19 +933,18 @@ export function useGRMEData(
         return nextData;
       });
 
+      enqueueMutation({
+        id: generateId(),
+        type: "deleteYear",
+        cityId: activeCityId,
+        year,
+        thromdeId: selectedThromde?.id,
+      });
       if (apiAvailable) {
-        await api.deleteYear(activeCityId, year, selectedThromde?.id);
-      } else {
-        enqueueMutation({
-          id: generateId(),
-          type: "deleteYear",
-          cityId: activeCityId,
-          year,
-          thromdeId: selectedThromde?.id,
-        });
+        await scheduleQueueFlush();
       }
     },
-    [activeCityId, ensureCity, apiAvailable, user, selectedThromde]
+    [activeCityId, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Update indicator ───────────────────────────────────────
@@ -1016,31 +1043,29 @@ export function useGRMEData(
         return nextData;
       });
 
+      enqueueMutation({
+        id: generateId(),
+        type: "saveIndicator",
+        cityId: activeCityId,
+        year: currentYear,
+        thromdeId: selectedThromde?.id,
+        indicatorId,
+        data: indicatorData,
+      });
+      enqueueMutation({
+        id: generateId(),
+        type: "addAuditEntry",
+        cityId: activeCityId,
+        year: currentYear,
+        thromdeId: selectedThromde?.id,
+        indicatorId,
+        entry: auditEntry,
+      });
       if (apiAvailable) {
-        await api.saveAssessment(activeCityId, currentYear, indicatorId, indicatorData, selectedThromde?.id);
-        await api.addAuditEntry(activeCityId, currentYear, indicatorId, auditEntry);
-      } else {
-        enqueueMutation({
-          id: generateId(),
-          type: "saveIndicator",
-          cityId: activeCityId,
-          year: currentYear,
-          thromdeId: selectedThromde?.id,
-          indicatorId,
-          data: indicatorData,
-        });
-        enqueueMutation({
-          id: generateId(),
-          type: "addAuditEntry",
-          cityId: activeCityId,
-          year: currentYear,
-          thromdeId: selectedThromde?.id,
-          indicatorId,
-          entry: auditEntry,
-        });
+        await scheduleQueueFlush();
       }
     },
-    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde]
+    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Add audit note ─────────────────────────────────────────
@@ -1120,21 +1145,20 @@ export function useGRMEData(
         return nextData;
       });
 
+      enqueueMutation({
+        id: generateId(),
+        type: "addAuditEntry",
+        cityId: activeCityId,
+        year: currentYear,
+        thromdeId: selectedThromde?.id,
+        indicatorId,
+        entry: auditEntry,
+      });
       if (apiAvailable) {
-        await api.addAuditEntry(activeCityId, currentYear, indicatorId, auditEntry);
-      } else {
-        enqueueMutation({
-          id: generateId(),
-          type: "addAuditEntry",
-          cityId: activeCityId,
-          year: currentYear,
-          thromdeId: selectedThromde?.id,
-          indicatorId,
-          entry: auditEntry,
-        });
+        await scheduleQueueFlush();
       }
     },
-    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde]
+    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Scoring ────────────────────────────────────────────────
