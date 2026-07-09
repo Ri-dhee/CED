@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Experience & Projects",
+  description: "A portfolio of CED's flagship projects in environmental management, sustainable development, and policy advisory across Asia.",
+};
+
 interface Project {
   title: string;
   client: string;

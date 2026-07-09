@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Experts",
+  description: "Meet CED's multidisciplinary team of environmental strategists, climate finance specialists, and policy advisors driving sustainable development.",
+};
+
 interface Expert {
   name: string;
   title: string;

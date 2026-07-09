@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Photos",
+  description: "A visual journey through CED's field research, community engagement, conservation initiatives, and events.",
+};
+
 const photos = [
   { alt: "Field Research — Forest Ecosystem Assessment", category: "Field Work" },
   { alt: "Community Engagement Workshop", category: "Community" },

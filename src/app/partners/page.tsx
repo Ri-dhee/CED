@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Partners",
+  description: "CED's network of partners including international organizations, government agencies, NGOs, and financial institutions advancing sustainable development.",
+};
+
 const partners = [
   { name: "Global Environment Facility", category: "International Organization" },
   { name: "United Nations Development Programme", category: "International Organization" },

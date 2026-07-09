@@ -16,7 +16,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CED | Center for Environment & Development",
+  title: {
+    default: "CED | Center for Environment & Development",
+    template: "%s | CED",
+  },
   description:
     "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
   metadataBase: new URL("https://ced-neon.vercel.app"),
@@ -28,14 +31,12 @@ export const metadata: Metadata = {
     siteName: "CED",
     locale: "en_US",
     type: "website",
-    images: ["/og-image.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "CED | Center for Environment & Development",
     description:
       "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
-    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -79,7 +80,7 @@ export default function RootLayout({
               name: "Center for Environment & Development",
               alternateName: "CED",
               url: "https://ced-neon.vercel.app",
-              logo: "https://ced-neon.vercel.app/logo.png",
+              logo: "https://ced-neon.vercel.app/logo.svg",
               description:
                 "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
               contactPoint: {

@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About",
+  description: "CED is a premier private consultation firm specializing in environmental management, sustainable development, and policy advisory across Asia and beyond.",
+};
+
 export default function About() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
