@@ -2,14 +2,13 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
-  CITIES,
   getStatusFromScore,
   getStatusColor,
   areYearsComparable,
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
-import { useGrmeUser, canEditFramework, canEnterData } from "@/lib/grme-user";
+import { useGrmeUser, canEditFramework, canEnterData, canAccessDzongkhag, getAccessibleDzongkhags, GrmeUser } from "@/lib/grme-user";
 import {
   exportYearCsv,
   exportAllYearsCsv,
@@ -68,7 +67,7 @@ function GRMEApp({
   onSwitchRole,
   onLogout,
 }: {
-  user: { name: string; role: "admin" | "editor" | "viewer"; loginAt: string };
+  user: GrmeUser;
   onSwitchRole: (role: "admin" | "editor" | "viewer") => void;
   onLogout: () => void;
 }) {
@@ -84,6 +83,9 @@ function GRMEApp({
     assessment,
     selectedCity,
     setSelectedCity,
+    selectedThromdeId,
+    setSelectedThromdeId,
+    availableThromdes,
     availableYears,
     createYear,
     deleteYear,
@@ -99,7 +101,7 @@ function GRMEApp({
     apiAvailable,
     loading,
     refreshData,
-  } = useGRMEData(framework.domains, user.name, selectedYear);
+  } = useGRMEData(framework.domains, user.name, selectedYear, user);
 
   // Wire retryAll to refresh data (must be after useGRMEData so refreshData is defined)
   useEffect(() => {
@@ -121,7 +123,7 @@ function GRMEApp({
   // and the real-time subscription triggers a background refresh.
   const trackedUpdateIndicator = useCallback(
     async (indicatorId: string, value: number | string | boolean, notes?: string) => {
-      const syncId = `indicator-${selectedCity}-${selectedYear}-${indicatorId}`;
+      const syncId = `indicator-${selectedCity}-${selectedThromdeId || "dz"}-${selectedYear}-${indicatorId}`;
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await updateIndicator(indicatorId, value, notes);
@@ -130,12 +132,12 @@ function GRMEApp({
         onError();
       }
     },
-    [updateIndicator, trackSync, selectedCity, selectedYear]
+    [updateIndicator, trackSync, selectedCity, selectedYear, selectedThromdeId]
   );
 
   const trackedAddAuditNote = useCallback(
     async (indicatorId: string, note: string) => {
-      const syncId = `audit-${selectedCity}-${selectedYear}-${indicatorId}`;
+      const syncId = `audit-${selectedCity}-${selectedThromdeId || "dz"}-${selectedYear}-${indicatorId}`;
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await addAuditNote(indicatorId, note);
@@ -144,12 +146,12 @@ function GRMEApp({
         onError();
       }
     },
-    [addAuditNote, trackSync, selectedCity, selectedYear]
+    [addAuditNote, trackSync, selectedCity, selectedYear, selectedThromdeId]
   );
 
   const trackedCreateYear = useCallback(
     async (year: number, copyFrom?: number) => {
-      const syncId = `create-year-${selectedCity}-${year}`;
+      const syncId = `create-year-${selectedCity}-${selectedThromdeId || "dz"}-${year}`;
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await createYear(year, copyFrom);
@@ -158,12 +160,12 @@ function GRMEApp({
         onError();
       }
     },
-    [createYear, trackSync, selectedCity]
+    [createYear, trackSync, selectedCity, selectedThromdeId]
   );
 
   const trackedDeleteYear = useCallback(
     async (year: number) => {
-      const syncId = `delete-year-${selectedCity}-${year}`;
+      const syncId = `delete-year-${selectedCity}-${selectedThromdeId || "dz"}-${year}`;
       const { onSuccess, onError } = trackSync(syncId);
       try {
         await deleteYear(year);
@@ -178,7 +180,7 @@ function GRMEApp({
         onError();
       }
     },
-    [deleteYear, trackSync, selectedCity, selectedYear, availableYears]
+    [deleteYear, trackSync, selectedCity, selectedThromdeId, selectedYear, availableYears]
   );
 
   const currentDomain =
@@ -275,7 +277,11 @@ function GRMEApp({
   }, [framework.domains, getDomainScoreForYear, overlayYears]);
 
   const isAdmin = canEditFramework(user.role);
-  const canEdit = canEnterData(user.role);
+  const canEdit = canEnterData(user.role) && canAccessDzongkhag(user, selectedCity);
+  const accessibleDzongkhags = getAccessibleDzongkhags(user);
+  const currentScopeLabel = selectedThromdeId
+    ? `Thromde: ${availableThromdes.find((t) => t.id === selectedThromdeId)?.name || selectedThromdeId}`
+    : "Dzongkhag scope";
 
   if (loading) {
     return (
@@ -322,13 +328,32 @@ function GRMEApp({
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                {CITIES.map((c) => (
+                {accessibleDzongkhags.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
               </select>
             </div>
+            {availableThromdes.length > 0 && (
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-600">
+                  Thromde:
+                </label>
+                <select
+                  value={selectedThromdeId}
+                  onChange={(e) => setSelectedThromdeId(e.target.value)}
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="">Dzongkhag total</option>
+                  {availableThromdes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="h-4 w-px bg-gray-200 hidden sm:block" />
             <YearSelector
               selectedYear={selectedYear}
@@ -373,6 +398,10 @@ function GRMEApp({
                   >
                     {Math.round(overallScore)}
                   </span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Scope:</span>
+                  <span className="ml-2 font-semibold text-gray-700">{currentScopeLabel}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">

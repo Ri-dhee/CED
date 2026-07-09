@@ -3,8 +3,10 @@ import { createHmac, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import * as api from "@/lib/grme-api";
 import { GRME_SESSION_COOKIE, getSessionSecret, GrmeSessionUser } from "@/lib/grme-session";
-import { UserRole } from "@/lib/grme-user";
+import { UserRole, UserScope } from "@/lib/grme-user";
 import { hasSupabaseConfig } from "@/lib/supabase";
+
+const DEFAULT_SCOPE: UserScope = { dzongkhagId: "", thromdeId: null, stakeholderId: "" };
 
 // ── Rate limiter (in-memory, best-effort across serverless instances) ──
 
@@ -92,11 +94,16 @@ async function verifyLogin(
     if (!expected || !password) return null;
     const valid = await bcrypt.compare(password, expected);
     if (!valid) return null;
-    return { name: normalizedName, role: "admin", loginAt: new Date().toISOString() };
+    return { name: normalizedName, role: "admin", loginAt: new Date().toISOString(), scope: DEFAULT_SCOPE };
   }
 
   if (!password && existingSession?.role === "admin") {
-    return { name: existingSession.name, role, loginAt: new Date().toISOString() };
+    return {
+      name: existingSession.name,
+      role,
+      loginAt: new Date().toISOString(),
+      scope: existingSession.scope || DEFAULT_SCOPE,
+    };
   }
 
   const users = hasSupabaseConfig ? await api.loadUsers().catch(() => []) : [];
@@ -106,7 +113,16 @@ async function verifyLogin(
     if (!password) return null;
     const valid = await bcrypt.compare(password, found.passwordHash);
     if (!valid) return null;
-    return { name: found.name, role: found.role, loginAt: new Date().toISOString() };
+    return {
+      name: found.name,
+      role: found.role,
+      loginAt: new Date().toISOString(),
+      scope: {
+        dzongkhagId: found.dzongkhagId,
+        thromdeId: found.thromdeId,
+        stakeholderId: found.stakeholderId,
+      },
+    };
   }
 
   return null;

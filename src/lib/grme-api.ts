@@ -12,6 +12,7 @@ import {
   IndicatorData,
   AuditEntry,
   CITIES,
+  Thromde,
 } from "./grme-data";
 import { FrameworkStorage } from "./grme-framework";
 import { ManagedUser } from "./grme-managed-users";
@@ -30,25 +31,31 @@ export async function loadAssessments(): Promise<Record<string, CityData>> {
   for (const row of data || []) {
     const cityId = row.city_id;
     const year = row.year;
+    const thromdeId = row.thromde_id || null;
 
     if (!result[cityId]) {
       result[cityId] = {
         cityId,
         cityName: getCityName(cityId),
         assessments: {},
+        thromdeAssessments: {},
       };
     }
-    if (!result[cityId].assessments[year]) {
-      result[cityId].assessments[year] = {
+    const targetAssessments = thromdeId
+      ? (result[cityId].thromdeAssessments![thromdeId] ||= {})
+      : result[cityId].assessments;
+    if (!targetAssessments[year]) {
+      targetAssessments[year] = {
         year,
         indicators: {},
         auditLog: [],
         createdAt: "",
         updatedAt: "",
+        thromdeId: thromdeId || undefined,
       };
     }
 
-    const assessment = result[cityId].assessments[year];
+    const assessment = targetAssessments[year];
     assessment.indicators[row.indicator_id] = {
       indicatorId: row.indicator_id,
       value: row.value === "" || row.value === null ? null : parseValue(row.value),
@@ -74,29 +81,48 @@ export async function saveAssessment(
   cityId: string,
   year: number,
   indicatorId: string,
-  data: IndicatorData
+  data: IndicatorData,
+  thromdeId?: string
 ): Promise<void> {
-  const { error } = await supabase().from("assessment_data").upsert(
-    {
-      city_id: cityId,
-      year,
-      indicator_id: indicatorId,
-      value: data.value !== null && data.value !== undefined ? String(data.value) : "",
-      evidence: data.evidence || "",
-      notes: data.notes || "",
-      last_updated: new Date().toISOString(),
-      updated_by: data.updatedBy || "",
-    },
-    { onConflict: "city_id,year,indicator_id" }
-  );
+  let scope = supabase()
+    .from("assessment_data")
+    .delete()
+    .eq("city_id", cityId)
+    .eq("year", year)
+    .eq("indicator_id", indicatorId);
+  scope = thromdeId ? scope.eq("thromde_id", thromdeId) : scope.is("thromde_id", null);
+  const { error: deleteError } = await scope;
+  if (deleteError) throw deleteError;
+
+  const { error } = await supabase().from("assessment_data").insert({
+    city_id: cityId,
+    year,
+    indicator_id: indicatorId,
+    value: data.value !== null && data.value !== undefined ? String(data.value) : "",
+    evidence: data.evidence || "",
+    notes: data.notes || "",
+    last_updated: new Date().toISOString(),
+    updated_by: data.updatedBy || "",
+    thromde_id: thromdeId || null,
+  });
   if (error) throw error;
 }
 
 export async function saveAssessments(
   cityId: string,
   year: number,
-  indicators: Record<string, IndicatorData>
+  indicators: Record<string, IndicatorData>,
+  thromdeId?: string
 ): Promise<void> {
+  let deleteQuery = supabase()
+    .from("assessment_data")
+    .delete()
+    .eq("city_id", cityId)
+    .eq("year", year);
+  deleteQuery = thromdeId ? deleteQuery.eq("thromde_id", thromdeId) : deleteQuery.is("thromde_id", null);
+  const { error: deleteError } = await deleteQuery;
+  if (deleteError) throw deleteError;
+
   const rows = Object.entries(indicators).map(([indicatorId, data]) => ({
     city_id: cityId,
     year,
@@ -106,25 +132,27 @@ export async function saveAssessments(
     notes: data.notes || "",
     last_updated: new Date().toISOString(),
     updated_by: data.updatedBy || "",
+    thromde_id: thromdeId || null,
   }));
 
   if (rows.length === 0) return;
 
-  const { error } = await supabase()
-    .from("assessment_data")
-    .upsert(rows, { onConflict: "city_id,year,indicator_id" });
+  const { error } = await supabase().from("assessment_data").insert(rows);
   if (error) throw error;
 }
 
 export async function deleteYear(
   cityId: string,
-  year: number
+  year: number,
+  thromdeId?: string
 ): Promise<void> {
-  const { error } = await supabase()
+  let query = supabase()
     .from("assessment_data")
     .delete()
     .eq("city_id", cityId)
     .eq("year", year);
+  query = thromdeId ? query.eq("thromde_id", thromdeId) : query.is("thromde_id", null);
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -267,6 +295,9 @@ export async function loadUsers(): Promise<ManagedUser[]> {
   return (data || []).map((u) => ({
     ...u,
     active: u.active === true || u.active === "true",
+    stakeholderId: u.stakeholder_id || "",
+    dzongkhagId: u.dzongkhag_id || "",
+    thromdeId: u.thromde_id || null,
   }));
 }
 
@@ -290,6 +321,9 @@ export async function saveUsers(users: ManagedUser[]): Promise<void> {
       created_at: u.createdAt,
       last_login_at: u.lastLoginAt,
       active: u.active,
+      stakeholder_id: u.stakeholderId || "",
+      dzongkhag_id: u.dzongkhagId || "",
+      thromde_id: u.thromdeId || null,
     }))
   );
   if (error) throw error;
@@ -311,6 +345,36 @@ function parseValue(val: unknown): number | string | boolean | null {
 
 function getCityName(cityId: string): string {
   return CITIES.find((c) => c.id === cityId)?.name || cityId;
+}
+
+// ── Thromdes ────────────────────────────────────────────────────
+
+export async function loadThromdes(): Promise<Thromde[]> {
+  const { data, error } = await supabase()
+    .from("thromdes")
+    .select("*")
+    .order("name");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveThromde(thromde: Thromde): Promise<void> {
+  const { error } = await supabase()
+    .from("thromdes")
+    .upsert({
+      id: thromde.id,
+      dzongkhag_id: thromde.dzongkhagId,
+      name: thromde.name,
+    }, { onConflict: "id" });
+  if (error) throw error;
+}
+
+export async function deleteThromde(id: string): Promise<void> {
+  const { error } = await supabase()
+    .from("thromdes")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
 }
 
 // ── Queue status ────────────────────────────────────────────────

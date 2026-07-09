@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   Domain,
+  CITIES,
   CityData,
   AssessmentYear,
   IndicatorData,
   AuditEntry,
   AuditLog,
+  Thromde,
   calculateIndicatorScore,
   calculateDomainScore,
   reconcileDataWithDomains,
@@ -21,6 +23,7 @@ import {
 } from "./grme-data";
 import * as api from "./grme-api";
 import { supabase, hasSupabaseConfig } from "./supabase";
+import { GrmeUser, canAccessDzongkhag, canAccessIndicator, canEnterData, getAccessibleDzongkhags } from "./grme-user";
 
 const STORAGE_KEY = "grme-data";
 const MIGRATION_SENTINEL_KEY = "grme-migration-v1";
@@ -92,6 +95,7 @@ function migrateOldFormat(raw: Record<string, unknown>): Record<string, CityData
             updatedAt: new Date().toISOString(),
           },
         },
+        thromdeAssessments: {},
       };
     } else if (isRecord(oldData.assessments)) {
       const sanitized = sanitizeCityData(oldData, cityId);
@@ -103,6 +107,7 @@ function migrateOldFormat(raw: Record<string, unknown>): Record<string, CityData
         cityId,
         cityName: cityId,
         assessments: {},
+        thromdeAssessments: {},
       };
     }
   }
@@ -138,10 +143,26 @@ function sanitizeCityData(value: unknown, cityId: string): CityData | null {
     if (sanitized) assessments[year] = sanitized;
   }
 
+  const thromdeAssessments: Record<string, Record<number, AssessmentYear>> = {};
+  if (isRecord(value.thromdeAssessments)) {
+    for (const [thromdeId, yearsValue] of Object.entries(value.thromdeAssessments)) {
+      if (!isRecord(yearsValue)) continue;
+      const years: Record<number, AssessmentYear> = {};
+      for (const [yearKey, assessValue] of Object.entries(yearsValue)) {
+        const year = Number(yearKey);
+        if (!Number.isFinite(year)) continue;
+        const sanitized = sanitizeAssessmentYear(assessValue, year);
+        if (sanitized) years[year] = { ...sanitized, thromdeId };
+      }
+      if (Object.keys(years).length > 0) thromdeAssessments[thromdeId] = years;
+    }
+  }
+
   return {
     cityId: typeof value.cityId === "string" ? value.cityId : cityId,
     cityName: typeof value.cityName === "string" ? value.cityName : cityId,
     assessments,
+    thromdeAssessments,
   };
 }
 
@@ -188,6 +209,7 @@ interface PendingMutation {
   type: "saveIndicator" | "addAuditEntry" | "createYear" | "deleteYear";
   cityId: string;
   year: number;
+  thromdeId?: string;
   indicatorId?: string;
   data?: IndicatorData;
   entry?: AuditEntry;
@@ -229,15 +251,15 @@ function saveQueue(queue: PendingMutation[]): void {
 function enqueueMutation(mutation: PendingMutation): void {
   const queue = loadQueue();
   const key = mutation.type === "saveIndicator" || mutation.type === "addAuditEntry"
-    ? `${mutation.cityId}:${mutation.year}:${mutation.indicatorId}`
-    : `${mutation.type}:${mutation.cityId}:${mutation.year}`;
+    ? `${mutation.cityId}:${mutation.thromdeId || "dz"}:${mutation.year}:${mutation.indicatorId}`
+    : `${mutation.type}:${mutation.cityId}:${mutation.thromdeId || "dz"}:${mutation.year}`;
 
   const idx = queue.findIndex((m) => {
     if (m.type !== mutation.type) return false;
     if (m.type === "saveIndicator" || m.type === "addAuditEntry") {
-      return `${m.cityId}:${m.year}:${m.indicatorId}` === key;
+      return `${m.cityId}:${m.thromdeId || "dz"}:${m.year}:${m.indicatorId}` === key;
     }
-    return `${m.type}:${m.cityId}:${m.year}` === key;
+    return `${m.type}:${m.cityId}:${m.thromdeId || "dz"}:${m.year}` === key;
   });
 
   if (idx >= 0) {
@@ -259,21 +281,29 @@ function applyPendingMutationsToData(
   for (const m of queue) {
     if (m.type === "saveIndicator" && m.data) {
       const city = next[m.cityId] = next[m.cityId] || {
-        cityId: m.cityId, cityName: m.cityId, assessments: {},
+        cityId: m.cityId, cityName: m.cityId, assessments: {}, thromdeAssessments: {},
       };
-      const year = city.assessments[m.year] = city.assessments[m.year] || {
+      const target = m.thromdeId
+        ? ((city.thromdeAssessments ||= {})[m.thromdeId] ||= {})
+        : city.assessments;
+      const year = target[m.year] = target[m.year] || {
         year: m.year, indicators: {}, auditLog: [],
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        thromdeId: m.thromdeId,
       };
       year.indicators[m.indicatorId!] = m.data;
     }
     if (m.type === "addAuditEntry" && m.entry) {
       const city = next[m.cityId] = next[m.cityId] || {
-        cityId: m.cityId, cityName: m.cityId, assessments: {},
+        cityId: m.cityId, cityName: m.cityId, assessments: {}, thromdeAssessments: {},
       };
-      const year = city.assessments[m.year] = city.assessments[m.year] || {
+      const target = m.thromdeId
+        ? ((city.thromdeAssessments ||= {})[m.thromdeId] ||= {})
+        : city.assessments;
+      const year = target[m.year] = target[m.year] || {
         year: m.year, indicators: {}, auditLog: [],
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        thromdeId: m.thromdeId,
       };
       const existing = year.auditLog.find((a) => a.indicatorId === m.indicatorId);
       if (existing) {
@@ -284,18 +314,27 @@ function applyPendingMutationsToData(
     }
     if (m.type === "createYear") {
       const city = next[m.cityId] = next[m.cityId] || {
-        cityId: m.cityId, cityName: m.cityId, assessments: {},
+        cityId: m.cityId, cityName: m.cityId, assessments: {}, thromdeAssessments: {},
       };
-      if (!city.assessments[m.year]) {
-        city.assessments[m.year] = {
+      const target = m.thromdeId
+        ? ((city.thromdeAssessments ||= {})[m.thromdeId] ||= {})
+        : city.assessments;
+      if (!target[m.year]) {
+        target[m.year] = {
           year: m.year, indicators: m.indicators || {}, auditLog: [],
-          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), thromdeId: m.thromdeId,
         };
       }
     }
     if (m.type === "deleteYear") {
       const city = next[m.cityId];
-      if (city) delete city.assessments[m.year];
+      if (city) {
+        if (m.thromdeId) {
+          if (city.thromdeAssessments?.[m.thromdeId]) delete city.thromdeAssessments[m.thromdeId][m.year];
+        } else {
+          delete city.assessments[m.year];
+        }
+      }
     }
   }
 
@@ -314,16 +353,16 @@ async function drainQueue(): Promise<void> {
     try {
       switch (m.type) {
         case "saveIndicator":
-          if (m.data) await api.saveAssessment(m.cityId, m.year, m.indicatorId!, m.data);
+          if (m.data) await api.saveAssessment(m.cityId, m.year, m.indicatorId!, m.data, m.thromdeId);
           break;
         case "addAuditEntry":
           if (m.entry) await api.addAuditEntry(m.cityId, m.year, m.indicatorId!, m.entry);
           break;
         case "createYear":
-          await api.saveAssessments(m.cityId, m.year, m.indicators || {});
+          await api.saveAssessments(m.cityId, m.year, m.indicators || {}, m.thromdeId);
           break;
         case "deleteYear":
-          await api.deleteYear(m.cityId, m.year);
+          await api.deleteYear(m.cityId, m.year, m.thromdeId);
           break;
       }
     } catch (err) {
@@ -347,10 +386,22 @@ function mergeAssessmentYear(
 
 function mergeCityData(remote: CityData, local: CityData): CityData {
   const assessments: Record<number, AssessmentYear> = { ...remote.assessments };
+  const thromdeAssessments: Record<string, Record<number, AssessmentYear>> = {
+    ...(remote.thromdeAssessments || {}),
+  };
 
   for (const [yearKey, localAssessment] of Object.entries(local.assessments)) {
     const year = Number(yearKey);
     assessments[year] = mergeAssessmentYear(assessments[year], localAssessment) || localAssessment;
+  }
+
+  for (const [thromdeId, years] of Object.entries(local.thromdeAssessments || {})) {
+    thromdeAssessments[thromdeId] = thromdeAssessments[thromdeId] || {};
+    for (const [yearKey, localAssessment] of Object.entries(years)) {
+      const year = Number(yearKey);
+      thromdeAssessments[thromdeId][year] =
+        mergeAssessmentYear(thromdeAssessments[thromdeId][year], localAssessment) || localAssessment;
+    }
   }
 
   return {
@@ -358,6 +409,7 @@ function mergeCityData(remote: CityData, local: CityData): CityData {
     cityId: local.cityId || remote.cityId,
     cityName: local.cityName || remote.cityName,
     assessments,
+    thromdeAssessments,
   };
 }
 
@@ -394,7 +446,32 @@ function mergeAuditLogsIntoData(
       }
       nextAssessments[year] = merged;
     }
-    next[cityId] = { ...city, assessments: nextAssessments };
+    const nextThromdeAssessments: Record<string, Record<number, AssessmentYear>> = {};
+    for (const [thromdeId, years] of Object.entries(city.thromdeAssessments || {})) {
+      nextThromdeAssessments[thromdeId] = {};
+      for (const [yearKey, assess] of Object.entries(years)) {
+        const year = Number(yearKey);
+        let merged = assess;
+        const remoteLogs = auditLogs[cityId]?.[year];
+        if (remoteLogs && remoteLogs.length > 0) {
+          const existingIds = new Set<string>();
+          for (const log of assess.auditLog) {
+            for (const e of log.entries) existingIds.add(e.id);
+          }
+          const mergedLogs = [...assess.auditLog];
+          for (const remoteLog of remoteLogs) {
+            const unseen = remoteLog.entries.filter((e) => !existingIds.has(e.id));
+            if (unseen.length === 0) continue;
+            const existing = mergedLogs.find((l) => l.indicatorId === remoteLog.indicatorId);
+            if (existing) existing.entries.push(...unseen);
+            else mergedLogs.push({ ...remoteLog, entries: unseen });
+          }
+          merged = { ...assess, auditLog: mergedLogs };
+        }
+        nextThromdeAssessments[thromdeId][year] = merged;
+      }
+    }
+    next[cityId] = { ...city, assessments: nextAssessments, thromdeAssessments: nextThromdeAssessments };
   }
   return next;
 }
@@ -446,10 +523,38 @@ function getOrCreateAssessment(
   };
 }
 
+function getOrCreateScopedAssessment(
+  city: CityData,
+  year: number,
+  thromdeId?: string
+): AssessmentYear {
+  if (!thromdeId) return getOrCreateAssessment(city, year);
+
+  city.thromdeAssessments = city.thromdeAssessments || {};
+  city.thromdeAssessments[thromdeId] = city.thromdeAssessments[thromdeId] || {};
+  if (city.thromdeAssessments[thromdeId][year]) return city.thromdeAssessments[thromdeId][year];
+
+  const assessment = {
+    year,
+    indicators: {},
+    auditLog: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    thromdeId,
+  };
+  city.thromdeAssessments[thromdeId][year] = assessment;
+  return assessment;
+}
+
 function getAvailableYears(city: CityData): number[] {
   return Object.keys(city.assessments)
     .map(Number)
     .sort((a, b) => b - a);
+}
+
+function getAvailableThromdeYears(city: CityData, thromdeId: string): number[] {
+  const years = city.thromdeAssessments?.[thromdeId] || {};
+  return Object.keys(years).map(Number).sort((a, b) => b - a);
 }
 
 // ── Hook ───────────────────────────────────────────────────────
@@ -457,17 +562,28 @@ function getAvailableYears(city: CityData): number[] {
 export function useGRMEData(
   domains: Domain[],
   userName?: string,
-  selectedYear?: number
+  selectedYear?: number,
+  user?: GrmeUser
 ) {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
+  const [selectedThromdeId, setSelectedThromdeId] = useState<string>("");
+  const [thromdes, setThromdes] = useState<Thromde[]>([]);
   const [apiAvailable, setApiAvailable] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const domainsRef = useRef(domains);
   const currentUser = userName || "Stakeholder";
   const currentYear = selectedYear || new Date().getFullYear();
+  const accessibleCityIds = useMemo(() => {
+    if (!user || user.role === "admin") return new Set(CITIES.map((c) => c.id));
+    return new Set(getAccessibleDzongkhags(user).map((c) => c.id));
+  }, [user]);
+  const activeCityId = useMemo(() => {
+    if (accessibleCityIds.size === 0) return selectedCity;
+    return accessibleCityIds.has(selectedCity) ? selectedCity : [...accessibleCityIds][0] || selectedCity;
+  }, [accessibleCityIds, selectedCity]);
 
   useEffect(() => {
     domainsRef.current = domains;
@@ -481,11 +597,13 @@ export function useGRMEData(
       const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
       saveAllData(localData);
       setAllData(localData);
+      setThromdes([]);
       setApiAvailable(false);
       return;
     }
     try {
       const apiData = await api.loadAssessments();
+      const apiThromdes = await api.loadThromdes().catch(() => []);
       const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
       const localData = loadAllData();
       // Server is source of truth; local fills gaps (cities/years not in Supabase)
@@ -498,10 +616,12 @@ export function useGRMEData(
       merged = applyPendingMutationsToData(merged);
 
       setAllData(merged);
+      setThromdes(apiThromdes);
       saveAllData(merged);
       setApiAvailable(true);
       await drainQueue();
     } catch {
+      setThromdes([]);
       setApiAvailable(false);
     }
   }, []);
@@ -530,6 +650,7 @@ export function useGRMEData(
           const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
           saveAllData(localData);
           setAllData(localData);
+          setThromdes([]);
           setApiAvailable(false);
           setLoading(false);
         }
@@ -537,6 +658,7 @@ export function useGRMEData(
       }
       try {
         const apiData = await api.loadAssessments();
+        const apiThromdes = await api.loadThromdes().catch(() => []);
         if (!cancelled) {
           const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
           const localData = loadAllData();
@@ -548,6 +670,7 @@ export function useGRMEData(
           merged = applyPendingMutationsToData(merged);
 
           setAllData(merged);
+          setThromdes(apiThromdes);
           saveAllData(merged);
           setApiAvailable(true);
           setLoading(false);
@@ -559,6 +682,7 @@ export function useGRMEData(
           const withPending = applyPendingMutationsToData(localData);
           saveAllData(withPending);
           setAllData(withPending);
+          setThromdes([]);
           setApiAvailable(false);
           setLoading(false);
         }
@@ -610,28 +734,83 @@ export function useGRMEData(
         cityId,
         cityName: cityId,
         assessments: {},
+        thromdeAssessments: {},
       };
     },
     [allData]
   );
 
-  const cityData = ensureCity(selectedCity);
-  const assessment =
-    cityData.assessments[currentYear] ||
-    getOrCreateAssessment(cityData, currentYear);
-  const availableYears = getAvailableYears(cityData);
+  const visibleAllData = useMemo(() => {
+    if (!user || user.role === "admin") return allData;
+    const next: Record<string, CityData> = {};
+    for (const cityId of accessibleCityIds) {
+      if (allData[cityId]) next[cityId] = allData[cityId];
+    }
+    return next;
+  }, [allData, accessibleCityIds, user]);
+
+  const visibleCityData = useMemo(
+    () =>
+      visibleAllData[activeCityId] || {
+        cityId: activeCityId,
+        cityName: activeCityId,
+        assessments: {},
+        thromdeAssessments: {},
+      },
+    [activeCityId, visibleAllData]
+  );
+  const availableThromdes = useMemo(
+    () => thromdes.filter((t) => t.dzongkhagId === activeCityId),
+    [thromdes, activeCityId]
+  );
+  const validSelectedThromdeId = useMemo(
+    () => (availableThromdes.some((t) => t.id === selectedThromdeId) ? selectedThromdeId : ""),
+    [availableThromdes, selectedThromdeId]
+  );
+  const selectedThromde = useMemo(
+    () => availableThromdes.find((t) => t.id === validSelectedThromdeId) || null,
+    [availableThromdes, validSelectedThromdeId]
+  );
+  const assessment = useMemo(() => {
+    if (selectedThromde) {
+      return (
+        visibleCityData.thromdeAssessments?.[selectedThromde.id]?.[currentYear] || {
+          year: currentYear,
+          indicators: {},
+          auditLog: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          thromdeId: selectedThromde.id,
+        }
+      );
+    }
+    return visibleCityData.assessments[currentYear] || getOrCreateAssessment(visibleCityData, currentYear);
+  }, [currentYear, selectedThromde, visibleCityData]);
+  const availableYears = selectedThromde
+    ? getAvailableThromdeYears(visibleCityData, selectedThromde.id)
+    : getAvailableYears(visibleCityData);
+  const scopedCityData = selectedThromde
+    ? {
+        ...visibleCityData,
+        assessments: visibleCityData.thromdeAssessments?.[selectedThromde.id] || {},
+      }
+    : visibleCityData;
 
   // ── Create new year ────────────────────────────────────────
 
   const createYear = useCallback(
     async (year: number, copyFrom?: number) => {
+      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
       let indicators: Record<string, IndicatorData> = {};
       let auditLog: AuditLog[] = [];
 
-      const city = ensureCity(selectedCity);
-      if (copyFrom && city.assessments[copyFrom]) {
+      const city = ensureCity(activeCityId);
+      const copySource = selectedThromde
+        ? city.thromdeAssessments?.[selectedThromde.id]?.[copyFrom || 0]
+        : city.assessments[copyFrom || 0];
+      if (copyFrom && copySource) {
         indicators = JSON.parse(
-          JSON.stringify(city.assessments[copyFrom].indicators)
+          JSON.stringify(copySource.indicators)
         );
         auditLog = [];
       }
@@ -642,6 +821,7 @@ export function useGRMEData(
         auditLog,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        thromdeId: selectedThromde?.id,
         scoringMetadata: {
           engineVersion: SCORING_ENGINE_VERSION,
           benchmarkSnapshotId: computeBenchmarkSnapshotId(domainsRef.current),
@@ -653,76 +833,102 @@ export function useGRMEData(
         ...city,
         assessments: {
           ...city.assessments,
-          [year]: newAssessment,
         },
+        thromdeAssessments: { ...(city.thromdeAssessments || {}) },
       };
+
+      if (selectedThromde) {
+        updatedCity.thromdeAssessments![selectedThromde.id] = {
+          ...(updatedCity.thromdeAssessments![selectedThromde.id] || {}),
+          [year]: newAssessment,
+        };
+      } else {
+        updatedCity.assessments = {
+          ...city.assessments,
+          [year]: newAssessment,
+        };
+      }
 
       setAllData((prev) => {
         const nextData = {
           ...prev,
-          [selectedCity]: updatedCity,
+          [activeCityId]: updatedCity,
         };
         saveAllData(nextData);
         return nextData;
       });
 
       if (apiAvailable) {
-        await api.saveAssessments(selectedCity, year, indicators);
+        await api.saveAssessments(activeCityId, year, indicators, selectedThromde?.id);
       } else {
         enqueueMutation({
           id: generateId(),
           type: "createYear",
-          cityId: selectedCity,
+          cityId: activeCityId,
           year,
+          thromdeId: selectedThromde?.id,
           indicators,
         });
       }
     },
-    [selectedCity, ensureCity, apiAvailable]
+    [activeCityId, ensureCity, apiAvailable, user, selectedThromde]
   );
 
   // ── Delete year ────────────────────────────────────────────
 
   const deleteYear = useCallback(
     async (year: number) => {
-      const city = ensureCity(selectedCity);
+      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      const city = ensureCity(activeCityId);
       const newAssessments = { ...city.assessments };
-      delete newAssessments[year];
+      const nextThromdeAssessments = { ...(city.thromdeAssessments || {}) };
+      if (selectedThromde) {
+        const scoped = { ...(nextThromdeAssessments[selectedThromde.id] || {}) };
+        delete scoped[year];
+        nextThromdeAssessments[selectedThromde.id] = scoped;
+      } else {
+        delete newAssessments[year];
+      }
 
       const updatedCity: CityData = {
         ...city,
         assessments: newAssessments,
+        thromdeAssessments: nextThromdeAssessments,
       };
 
       setAllData((prev) => {
         const nextData = {
           ...prev,
-          [selectedCity]: updatedCity,
+          [activeCityId]: updatedCity,
         };
         saveAllData(nextData);
         return nextData;
       });
 
       if (apiAvailable) {
-        await api.deleteYear(selectedCity, year);
+        await api.deleteYear(activeCityId, year, selectedThromde?.id);
       } else {
         enqueueMutation({
           id: generateId(),
           type: "deleteYear",
-          cityId: selectedCity,
+          cityId: activeCityId,
           year,
+          thromdeId: selectedThromde?.id,
         });
       }
     },
-    [selectedCity, ensureCity, apiAvailable]
+    [activeCityId, ensureCity, apiAvailable, user, selectedThromde]
   );
 
   // ── Update indicator ───────────────────────────────────────
 
   const updateIndicator = useCallback(
     async (indicatorId: string, value: number | string | boolean, notes?: string) => {
-      const city = ensureCity(selectedCity);
-      const assess = getOrCreateAssessment(city, currentYear);
+      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
+      if (user && indicator && !canAccessIndicator(user, indicator)) return;
+      const city = ensureCity(activeCityId);
+      const assess = getOrCreateScopedAssessment(city, currentYear, selectedThromde?.id);
       const existing = assess.indicators[indicatorId];
       const newValue = String(value);
 
@@ -785,50 +991,67 @@ export function useGRMEData(
         ...city,
         assessments: {
           ...city.assessments,
-          [currentYear]: updatedAssessment,
         },
+        thromdeAssessments: { ...(city.thromdeAssessments || {}) },
       };
+
+      if (selectedThromde) {
+        updatedCity.thromdeAssessments![selectedThromde.id] = {
+          ...(updatedCity.thromdeAssessments![selectedThromde.id] || {}),
+          [currentYear]: { ...updatedAssessment, thromdeId: selectedThromde.id },
+        };
+      } else {
+        updatedCity.assessments = {
+          ...city.assessments,
+          [currentYear]: updatedAssessment,
+        };
+      }
 
       setAllData((prev) => {
         const nextData = {
           ...prev,
-          [selectedCity]: updatedCity,
+          [activeCityId]: updatedCity,
         };
         saveAllData(nextData);
         return nextData;
       });
 
       if (apiAvailable) {
-        await api.saveAssessment(selectedCity, currentYear, indicatorId, indicatorData);
-        await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
+        await api.saveAssessment(activeCityId, currentYear, indicatorId, indicatorData, selectedThromde?.id);
+        await api.addAuditEntry(activeCityId, currentYear, indicatorId, auditEntry);
       } else {
         enqueueMutation({
           id: generateId(),
           type: "saveIndicator",
-          cityId: selectedCity,
+          cityId: activeCityId,
           year: currentYear,
+          thromdeId: selectedThromde?.id,
           indicatorId,
           data: indicatorData,
         });
         enqueueMutation({
           id: generateId(),
           type: "addAuditEntry",
-          cityId: selectedCity,
+          cityId: activeCityId,
           year: currentYear,
+          thromdeId: selectedThromde?.id,
           indicatorId,
           entry: auditEntry,
         });
       }
     },
-    [selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
+    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde]
   );
 
   // ── Add audit note ─────────────────────────────────────────
 
   const addAuditNote = useCallback(
     async (indicatorId: string, note: string) => {
-      const city = ensureCity(selectedCity);
-      const assess = getOrCreateAssessment(city, currentYear);
+      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
+      if (user && indicator && !canAccessIndicator(user, indicator)) return;
+      const city = ensureCity(activeCityId);
+      const assess = getOrCreateScopedAssessment(city, currentYear, selectedThromde?.id);
 
       const auditEntry: AuditEntry = {
         id: generateId(),
@@ -872,33 +1095,46 @@ export function useGRMEData(
         ...city,
         assessments: {
           ...city.assessments,
-          [currentYear]: updatedAssessment,
         },
+        thromdeAssessments: { ...(city.thromdeAssessments || {}) },
       };
+
+      if (selectedThromde) {
+        updatedCity.thromdeAssessments![selectedThromde.id] = {
+          ...(updatedCity.thromdeAssessments![selectedThromde.id] || {}),
+          [currentYear]: { ...updatedAssessment, thromdeId: selectedThromde.id },
+        };
+      } else {
+        updatedCity.assessments = {
+          ...city.assessments,
+          [currentYear]: updatedAssessment,
+        };
+      }
 
       setAllData((prev) => {
         const nextData = {
           ...prev,
-          [selectedCity]: updatedCity,
+          [activeCityId]: updatedCity,
         };
         saveAllData(nextData);
         return nextData;
       });
 
       if (apiAvailable) {
-        await api.addAuditEntry(selectedCity, currentYear, indicatorId, auditEntry);
+        await api.addAuditEntry(activeCityId, currentYear, indicatorId, auditEntry);
       } else {
         enqueueMutation({
           id: generateId(),
           type: "addAuditEntry",
-          cityId: selectedCity,
+          cityId: activeCityId,
           year: currentYear,
+          thromdeId: selectedThromde?.id,
           indicatorId,
           entry: auditEntry,
         });
       }
     },
-    [selectedCity, currentYear, currentUser, ensureCity, apiAvailable]
+    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde]
   );
 
   // ── Scoring ────────────────────────────────────────────────
@@ -1055,17 +1291,21 @@ export function useGRMEData(
       percentage: number;
       confidence: number;
     } => {
-      const city = ensureCity(selectedCity);
-      const assess = city.assessments[year];
+      const city = ensureCity(activeCityId);
+      const assess = selectedThromde
+        ? city.thromdeAssessments?.[selectedThromde.id]?.[year]
+        : city.assessments[year];
       return getAssessmentStats(assess);
     },
-    [ensureCity, getAssessmentStats, selectedCity]
+    [ensureCity, getAssessmentStats, activeCityId, selectedThromde]
   );
 
   const getScoreForYear = useCallback(
     (year: number): number => {
-      const city = ensureCity(selectedCity);
-      const assess = city.assessments[year];
+      const city = ensureCity(activeCityId);
+      const assess = selectedThromde
+        ? city.thromdeAssessments?.[selectedThromde.id]?.[year]
+        : city.assessments[year];
       if (!assess) return 0;
 
       const getScoreForIndicator = (indicatorId: string): number | null => {
@@ -1088,13 +1328,15 @@ export function useGRMEData(
       const confidence = getAssessmentStats(assess).confidence;
       return adjustScoreForConfidence(raw, confidence);
     },
-    [ensureCity, getAssessmentStats, selectedCity]
+    [ensureCity, getAssessmentStats, activeCityId, selectedThromde]
   );
 
   const getDomainScoreForYear = useCallback(
     (domainId: string, year: number): number => {
-      const city = ensureCity(selectedCity);
-      const assess = city.assessments[year];
+      const city = ensureCity(activeCityId);
+      const assess = selectedThromde
+        ? city.thromdeAssessments?.[selectedThromde.id]?.[year]
+        : city.assessments[year];
       if (!assess) return 50;
 
       const domain = domainsRef.current.find((d) => d.id === domainId);
@@ -1116,15 +1358,19 @@ export function useGRMEData(
       const confidence = getDomainStatsForAssessment(domain, assess).confidence;
       return adjustScoreForConfidence(raw, confidence);
     },
-    [ensureCity, getDomainStatsForAssessment, selectedCity]
+    [ensureCity, getDomainStatsForAssessment, activeCityId, selectedThromde]
   );
 
   return {
-    allData,
-    cityData,
+    allData: visibleAllData,
+    cityData: scopedCityData,
     assessment,
-    selectedCity,
+    selectedCity: activeCityId,
     setSelectedCity,
+    selectedThromdeId: validSelectedThromdeId,
+    setSelectedThromdeId,
+    availableThromdes,
+    selectedThromde,
     selectedYear: currentYear,
     availableYears,
     createYear,

@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ── Mocks for child modules ──────────────────────────────────
 
 const mockLogin = vi.fn();
-let mockUserState: { user: { name: string; role: string; loginAt: string } | null; loaded: boolean } = {
+let mockUserState: { user: { name: string; role: string; loginAt: string; scope: { dzongkhagId: string; thromdeId: string | null; stakeholderId: string } } | null; loaded: boolean } = {
   user: null,
   loaded: false,
 };
+
+const adminScope = { dzongkhagId: "", thromdeId: null, stakeholderId: "" };
 
 vi.mock("@/lib/grme-user", () => ({
   useGrmeUser: () => ({
@@ -20,6 +22,8 @@ vi.mock("@/lib/grme-user", () => ({
   }),
   canEditFramework: (role: string) => role === "admin",
   canEnterData: (role: string) => role === "admin" || role === "editor",
+  canAccessDzongkhag: () => true,
+  getAccessibleDzongkhags: () => ([{ id: "thimphu", name: "Thimphu" }]),
 }));
 
 vi.mock("@/lib/grme-framework-store", () => ({
@@ -37,7 +41,10 @@ vi.mock("@/lib/grme-store", () => ({
     cityData: { cityId: "thimphu", cityName: "Thimphu", assessments: {} },
     assessment: { indicators: {}, auditLog: [] },
     availableYears: [2026],
+    availableThromdes: [],
     selectedYear: 2026,
+    selectedThromdeId: "",
+    setSelectedThromdeId: vi.fn(),
     createYear: vi.fn(),
     deleteYear: vi.fn(),
     updateIndicator: vi.fn(),
@@ -114,7 +121,7 @@ describe("GRMEPage auth state machine", () => {
 
   it("renders the dashboard (GRMEApp) when a user is logged in", async () => {
     mockUserState = {
-      user: { name: "Admin", role: "admin", loginAt: new Date().toISOString() },
+      user: { name: "Admin", role: "admin", loginAt: new Date().toISOString(), scope: adminScope },
       loaded: true,
     };
     render(<GRMEPage />);
@@ -127,7 +134,7 @@ describe("GRMEPage auth state machine", () => {
 
   it("shows data entry tab for admin users", async () => {
     mockUserState = {
-      user: { name: "Admin", role: "admin", loginAt: new Date().toISOString() },
+      user: { name: "Admin", role: "admin", loginAt: new Date().toISOString(), scope: adminScope },
       loaded: true,
     };
     render(<GRMEPage />);
@@ -138,7 +145,7 @@ describe("GRMEPage auth state machine", () => {
 
   it("shows framework tab for admin users", async () => {
     mockUserState = {
-      user: { name: "Admin", role: "admin", loginAt: new Date().toISOString() },
+      user: { name: "Admin", role: "admin", loginAt: new Date().toISOString(), scope: adminScope },
       loaded: true,
     };
     render(<GRMEPage />);
@@ -149,7 +156,7 @@ describe("GRMEPage auth state machine", () => {
 
   it("shows data entry tab but NOT framework tab for editors", async () => {
     mockUserState = {
-      user: { name: "Editor", role: "editor", loginAt: new Date().toISOString() },
+      user: { name: "Editor", role: "editor", loginAt: new Date().toISOString(), scope: { dzongkhagId: "thimphu", thromdeId: null, stakeholderId: "planning" } },
       loaded: true,
     };
     render(<GRMEPage />);
@@ -161,7 +168,7 @@ describe("GRMEPage auth state machine", () => {
 
   it("hides data entry and framework tabs for viewers", async () => {
     mockUserState = {
-      user: { name: "Viewer", role: "viewer", loginAt: new Date().toISOString() },
+      user: { name: "Viewer", role: "viewer", loginAt: new Date().toISOString(), scope: { dzongkhagId: "thimphu", thromdeId: null, stakeholderId: "planning" } },
       loaded: true,
     };
     render(<GRMEPage />);

@@ -1,9 +1,10 @@
-import { UserRole } from "./grme-user";
+import { UserRole, UserScope } from "./grme-user";
 
 export interface GrmeSessionUser {
   name: string;
   role: UserRole;
   loginAt: string;
+  scope?: UserScope;
 }
 
 export const GRME_SESSION_COOKIE = "grme-session";

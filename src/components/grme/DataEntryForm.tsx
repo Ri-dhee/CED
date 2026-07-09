@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   Indicator,
+  STAKEHOLDERS,
   calculateIndicatorScore,
   getStatusFromScore,
   getStatusColor,
@@ -92,6 +93,11 @@ export default function DataEntryForm({
             {indicator.validationStatus && indicator.validationStatus !== "validated" && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
                 {indicator.validationStatus === "draft" ? "Needs review" : "Reviewed"}
+              </span>
+            )}
+            {indicator.stakeholderAccess && indicator.stakeholderAccess.length > 0 && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                {indicator.stakeholderAccess.map((id) => STAKEHOLDERS.find((s) => s.id === id)?.name || id).join(", ")}
               </span>
             )}
             {lowerBetter && (

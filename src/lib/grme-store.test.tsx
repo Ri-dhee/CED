@@ -73,6 +73,7 @@ const domains: Domain[] = [
 
 const mockApiFns = {
   loadAssessments: vi.fn(),
+  loadThromdes: vi.fn(),
   saveAssessments: vi.fn(),
   saveAssessment: vi.fn(),
   deleteYear: vi.fn(),
@@ -377,6 +378,8 @@ describe("useGRMEData (online mode)", () => {
     vi.clearAllMocks();
     supabaseHasConfig = true;
     mockApiFns.loadAssessments = vi.fn().mockResolvedValue({});
+    mockApiFns.loadThromdes = vi.fn().mockResolvedValue([]);
+    mockApiFns.loadAuditLogsForAssessment = vi.fn().mockResolvedValue({});
     localStorage.clear();
   });
 
@@ -388,7 +391,8 @@ describe("useGRMEData (online mode)", () => {
     await updateAndWait(result, "ss-1", 80, "Online test");
     expect(mockApiFns.saveAssessment).toHaveBeenCalledWith(
       "thimphu", 2026, "ss-1",
-      expect.objectContaining({ value: 80, notes: "Online test" })
+      expect.objectContaining({ value: 80, notes: "Online test" }),
+      undefined
     );
     expect(mockApiFns.addAuditEntry).toHaveBeenCalledWith(
       "thimphu", 2026, "ss-1",
@@ -404,7 +408,7 @@ describe("useGRMEData (online mode)", () => {
     await act(async () => {
       await result.current.createYear(2027, 2026);
     });
-    expect(mockApiFns.saveAssessments).toHaveBeenCalledWith("thimphu", 2027, {});
+    expect(mockApiFns.saveAssessments).toHaveBeenCalledWith("thimphu", 2027, {}, undefined);
   });
 
   it("calls deleteYear when deleting a year", async () => {
@@ -418,7 +422,7 @@ describe("useGRMEData (online mode)", () => {
     await act(async () => {
       await result.current.deleteYear(2027);
     });
-    expect(mockApiFns.deleteYear).toHaveBeenCalledWith("thimphu", 2027);
+    expect(mockApiFns.deleteYear).toHaveBeenCalledWith("thimphu", 2027, undefined);
   });
 
   it("drains the offline queue on init when API is available", async () => {
@@ -432,7 +436,8 @@ describe("useGRMEData (online mode)", () => {
     });
     expect(mockApiFns.saveAssessment).toHaveBeenCalledWith(
       "thimphu", 2026, "ss-1",
-      expect.objectContaining({ value: 75 })
+      expect.objectContaining({ value: 75 }),
+      undefined
     );
     // Queue should be empty after drain
     expect(getQueue()).toHaveLength(0);
@@ -505,6 +510,7 @@ describe("offline mutation queue", () => {
   it("does NOT queue mutations when online", async () => {
     supabaseHasConfig = true;
     mockApiFns.loadAssessments = vi.fn().mockResolvedValue({});
+    mockApiFns.loadThromdes = vi.fn().mockResolvedValue([]);
     mockApiFns.loadAuditLogsForAssessment = vi.fn().mockResolvedValue({});
     const { result } = await mountHook();
     await waitFor(() => {

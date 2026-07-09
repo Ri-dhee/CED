@@ -1,13 +1,21 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { CITIES, Indicator } from "./grme-data";
 
 export type UserRole = "admin" | "editor" | "viewer";
+
+export interface UserScope {
+  dzongkhagId: string;
+  thromdeId: string | null;
+  stakeholderId: string;
+}
 
 export interface GrmeUser {
   name: string;
   role: UserRole;
   loginAt: string;
+  scope: UserScope;
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -28,8 +36,16 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   viewer: "View dashboard and data only",
 };
 
+const DEFAULT_SCOPE: UserScope = { dzongkhagId: "", thromdeId: null, stakeholderId: "" };
+
 function isUserRole(value: unknown): value is UserRole {
   return value === "admin" || value === "editor" || value === "viewer";
+}
+
+function isUserScope(value: unknown): value is UserScope {
+  if (!value || typeof value !== "object") return false;
+  const s = value as Record<string, unknown>;
+  return typeof s.dzongkhagId === "string" && (s.thromdeId === null || typeof s.thromdeId === "string") && typeof s.stakeholderId === "string";
 }
 
 function normalizeUser(value: unknown): GrmeUser | null {
@@ -40,6 +56,7 @@ function normalizeUser(value: unknown): GrmeUser | null {
     name: candidate.name,
     role: candidate.role,
     loginAt: typeof candidate.loginAt === "string" ? candidate.loginAt : new Date().toISOString(),
+    scope: isUserScope(candidate.scope) ? candidate.scope : DEFAULT_SCOPE,
   };
 }
 
@@ -49,6 +66,29 @@ export function canEditFramework(role: UserRole): boolean {
 
 export function canEnterData(role: UserRole): boolean {
   return role === "admin" || role === "editor";
+}
+
+/** Returns the list of dzongkhags a user is allowed to see. */
+export function getAccessibleDzongkhags(user: GrmeUser): typeof CITIES {
+  if (user.role === "admin") return CITIES;
+  if (user.scope.dzongkhagId) {
+    const match = CITIES.find((c) => c.id === user.scope.dzongkhagId);
+    return match ? [match] : [];
+  }
+  return [];
+}
+
+/** True if the user can edit data in the given dzongkhag. */
+export function canAccessDzongkhag(user: GrmeUser, dzongkhagId: string): boolean {
+  if (user.role === "admin") return true;
+  return user.scope.dzongkhagId === dzongkhagId;
+}
+
+/** True if the user can edit a specific indicator (checks stakeholder access). */
+export function canAccessIndicator(user: GrmeUser, indicator: Indicator): boolean {
+  if (user.role === "admin") return true;
+  if (!indicator.stakeholderAccess || indicator.stakeholderAccess.length === 0) return true;
+  return indicator.stakeholderAccess.includes(user.scope.stakeholderId);
 }
 
 async function loadSessionUser(): Promise<GrmeUser | null> {
@@ -65,14 +105,15 @@ async function loadSessionUser(): Promise<GrmeUser | null> {
 async function saveSessionUser(
   name: string,
   role: UserRole,
-  password?: string
+  password?: string,
+  scope?: UserScope
 ): Promise<{ success: boolean; error?: string; user?: GrmeUser }> {
   try {
     const res = await fetch("/api/grme/session", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, role, password }),
+      body: JSON.stringify({ name, role, password, scope }),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -121,8 +162,8 @@ export function useGrmeUser() {
     };
   }, []);
 
-  const login = useCallback(async (name: string, role: UserRole, password?: string) => {
-    const result = await saveSessionUser(name.trim(), role, password);
+  const login = useCallback(async (name: string, role: UserRole, password?: string, scope?: UserScope) => {
+    const result = await saveSessionUser(name.trim(), role, password, scope);
     if (!result.success || !result.user) return result;
     setUser(result.user);
     return result;
@@ -142,7 +183,7 @@ export function useGrmeUser() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: updated.name, role }),
+        body: JSON.stringify({ name: updated.name, role, scope: updated.scope }),
       }).catch(() => {});
     },
     [user]

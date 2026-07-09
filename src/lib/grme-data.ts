@@ -2,6 +2,8 @@ export type IndicatorType = "Quantitative" | "Qualitative" | "Participatory";
 export type DataType = "percentage" | "number" | "ratio" | "index" | "text" | "boolean";
 export type ScoreStatus = "Critical" | "Developing" | "Progressive" | "Exemplary";
 export type Direction = "higher" | "lower"; // higher = better, lower = better
+export type ScoringLevel = "dzongkhag" | "thromde";
+export type StakeholderId = string;
 
 export interface AuditEntry {
   id: string;
@@ -34,6 +36,8 @@ export interface Indicator {
   source?: string;
   weight?: number;
   validationStatus?: "draft" | "reviewed" | "validated";
+  stakeholderAccess?: StakeholderId[];
+  scoringLevel?: ScoringLevel;
 }
 
 export interface SubDomain {
@@ -72,10 +76,22 @@ export interface AuditLog {
   entries: AuditEntry[];
 }
 
+export interface Thromde {
+  id: string;
+  dzongkhagId: string;
+  name: string;
+}
+
+export interface Stakeholder {
+  id: string;
+  name: string;
+}
+
 export interface CityData {
   cityId: string;
   cityName: string;
   assessments: Record<number, AssessmentYear>;
+  thromdeAssessments?: Record<string, Record<number, AssessmentYear>>;
 }
 
 /**
@@ -100,6 +116,7 @@ export interface AssessmentYear {
   createdAt: string;
   updatedAt: string;
   scoringMetadata?: ScoringMetadata;
+  thromdeId?: string;
 }
 
 /**
@@ -1518,6 +1535,24 @@ export const CITIES: { id: string; name: string }[] = [
   { id: "phuntsholing", name: "Phuntsholing" },
   { id: "gelephu", name: "Gelephu" },
   { id: "paro", name: "Paro" },
+];
+
+export const DZONGKHAGS = CITIES;
+
+export const THROMDES: Thromde[] = [
+  // { id: "thimphu-city", dzongkhagId: "thimphu", name: "Thimphu Thromde" },
+  // Populate via admin UI or seed data
+];
+
+export const STAKEHOLDERS: Stakeholder[] = [
+  { id: "water", name: "Water" },
+  { id: "energy", name: "Energy" },
+  { id: "environment", name: "Environment" },
+  { id: "transport", name: "Transport" },
+  { id: "governance", name: "Governance" },
+  { id: "finance", name: "Finance" },
+  { id: "social", name: "Social" },
+  { id: "planning", name: "Planning" },
 ];
 
 /** Deep-clone a value via structured clone (available in modern runtimes). */

@@ -9,6 +9,7 @@ import {
   ROLE_LABELS,
   ROLE_COLORS,
 } from "@/lib/grme-user";
+import { CITIES, THROMDES, STAKEHOLDERS } from "@/lib/grme-data";
 
 interface UserManagementProps {
   onClose: () => void;
@@ -31,10 +32,16 @@ export default function UserManagement({ onClose }: UserManagementProps) {
   const [newRole, setNewRole] = useState<UserRole>("editor");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [newStakeholder, setNewStakeholder] = useState("planning");
+  const [newDzongkhag, setNewDzongkhag] = useState("thimphu");
+  const [newThromde, setNewThromde] = useState("");
   const [error, setError] = useState("");
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("editor");
+  const [editStakeholder, setEditStakeholder] = useState("planning");
+  const [editDzongkhag, setEditDzongkhag] = useState("thimphu");
+  const [editThromde, setEditThromde] = useState("");
   const [showPasswordField, setShowPasswordField] = useState<string | null>(null);
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -53,7 +60,7 @@ export default function UserManagement({ onClose }: UserManagementProps) {
       return;
     }
 
-    const result = await addUser(newName.trim(), newRole, newPassword);
+    const result = await addUser(newName.trim(), newRole, newPassword, newStakeholder, newDzongkhag, newThromde || undefined);
     if (!result.success) {
       setError(result.error || "Failed to add user");
       return;
@@ -63,13 +70,16 @@ export default function UserManagement({ onClose }: UserManagementProps) {
     setNewRole("editor");
     setNewPassword("");
     setConfirmPassword("");
+    setNewStakeholder("planning");
+    setNewDzongkhag("thimphu");
+    setNewThromde("");
     setShowAddForm(false);
     setError("");
   };
 
   const handleUpdate = (id: string) => {
     if (!editName.trim()) return;
-    updateUser(id, { name: editName.trim(), role: editRole });
+    updateUser(id, { name: editName.trim(), role: editRole, stakeholderId: editStakeholder, dzongkhagId: editDzongkhag, thromdeId: editThromde || null });
     setEditingUser(null);
   };
 
@@ -166,6 +176,27 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                     {ROLES.map((r) => (
                       <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                     ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label htmlFor="grme-user-new-stakeholder" className="block text-xs font-medium text-gray-500 mb-1">Stakeholder</label>
+                  <select id="grme-user-new-stakeholder" name="stakeholder" value={newStakeholder} onChange={(e) => setNewStakeholder(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    {STAKEHOLDERS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="grme-user-new-dzongkhag" className="block text-xs font-medium text-gray-500 mb-1">Dzongkhag</label>
+                  <select id="grme-user-new-dzongkhag" name="dzongkhag" value={newDzongkhag} onChange={(e) => setNewDzongkhag(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    {CITIES.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="grme-user-new-thromde" className="block text-xs font-medium text-gray-500 mb-1">Thromde</label>
+                  <select id="grme-user-new-thromde" name="thromde" value={newThromde} onChange={(e) => setNewThromde(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">None</option>
+                    {THROMDES.filter((t) => t.dzongkhagId === newDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -270,6 +301,16 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                               <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                             ))}
                           </select>
+                          <select value={editStakeholder} onChange={(e) => setEditStakeholder(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
+                            {STAKEHOLDERS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                          <select value={editDzongkhag} onChange={(e) => setEditDzongkhag(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
+                            {CITIES.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                          <select value={editThromde} onChange={(e) => setEditThromde(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
+                            <option value="">None</option>
+                            {THROMDES.filter((t) => t.dzongkhagId === editDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
                           <button
                             onClick={() => handleUpdate(user.id)}
                             className="text-xs text-primary font-medium hover:underline"
@@ -313,6 +354,9 @@ export default function UserManagement({ onClose }: UserManagementProps) {
                             setEditingUser(user.id);
                             setEditName(user.name);
                             setEditRole(user.role);
+                            setEditStakeholder(user.stakeholderId || "planning");
+                            setEditDzongkhag(user.dzongkhagId || "thimphu");
+                            setEditThromde(user.thromdeId || "");
                           }}
                           className="p-1.5 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
                           title="Edit user"

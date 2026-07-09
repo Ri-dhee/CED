@@ -13,6 +13,9 @@ export interface ManagedUser {
   createdAt: string;
   lastLoginAt: string | null;
   active: boolean;
+  stakeholderId: string;
+  dzongkhagId: string;
+  thromdeId: string | null;
 }
 
 const STORAGE_KEY = "grme-managed-users";
@@ -27,7 +30,9 @@ function isManagedUser(value: unknown): value is ManagedUser {
     typeof user.passwordHash === "string" &&
     typeof user.createdAt === "string" &&
     (typeof user.lastLoginAt === "string" || user.lastLoginAt === null) &&
-    typeof user.active === "boolean"
+    typeof user.active === "boolean" &&
+    typeof user.stakeholderId === "string" &&
+    typeof user.dzongkhagId === "string"
   );
 }
 
@@ -176,7 +181,10 @@ export function useManagedUsers() {
     async (
       name: string,
       role: UserRole,
-      password: string
+      password: string,
+      stakeholderId?: string,
+      dzongkhagId?: string,
+      thromdeId?: string
     ): Promise<{ success: boolean; error?: string }> => {
       const existing = loadUsers();
       if (
@@ -196,6 +204,9 @@ export function useManagedUsers() {
         createdAt: new Date().toISOString(),
         lastLoginAt: null,
         active: true,
+        stakeholderId: role === "admin" ? "" : (stakeholderId || "planning"),
+        dzongkhagId: role === "admin" ? "" : (dzongkhagId || "thimphu"),
+        thromdeId: thromdeId || null,
       };
 
       const updated = [...existing, newUser];
@@ -209,7 +220,7 @@ export function useManagedUsers() {
   const updateUser = useCallback(
     (
       id: string,
-      updates: Partial<Pick<ManagedUser, "name" | "role" | "active">>
+      updates: Partial<Pick<ManagedUser, "name" | "role" | "active" | "stakeholderId" | "dzongkhagId" | "thromdeId">>
     ): void => {
       const existing = loadUsers();
       const updated = existing.map((u) =>
