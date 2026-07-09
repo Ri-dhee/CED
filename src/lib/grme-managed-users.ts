@@ -36,9 +36,14 @@ function sanitizeUsers(value: unknown): ManagedUser[] {
   return value.filter(isManagedUser);
 }
 
-// ── SHA-256 Hashing ─────────────────────────────────────────────
+// ── Password hashing ────────────────────────────────────────────
 
+// Client-side hash uses async subtle — the actual hashing is done
+// server-side via bcrypt in the API route. This stub exists for
+// fallback local-only mode; in production the API does bcrypt.compare.
 export async function hashPassword(password: string): Promise<string> {
+  // For client-side fallback, still use SHA-256 as a basic obfuscation.
+  // Production always compares via bcrypt on the server.
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);

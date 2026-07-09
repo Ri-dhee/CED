@@ -11,7 +11,6 @@ export const GRME_SESSION_COOKIE = "grme-session";
 export function getSessionSecret(): string {
   return (
     process.env.GRME_SESSION_SECRET ||
-    process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH ||
     "grme-dev-session-secret"
   );
 }

@@ -1,11 +1,11 @@
-import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it } from "vitest";
 
 const password = "GRME-Admin-2026";
-const passwordHash = createHash("sha256").update(password).digest("hex");
+const passwordHash = bcrypt.hashSync(password, 12);
 
 beforeEach(() => {
-  process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH = passwordHash;
+  process.env.ADMIN_PASSWORD_HASH = passwordHash;
   process.env.GRME_SESSION_SECRET = "test-session-secret";
 });
 

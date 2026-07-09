@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
+import bcrypt from "bcryptjs";
 import * as api from "@/lib/grme-api";
 import { GRME_SESSION_COOKIE, getSessionSecret, GrmeSessionUser } from "@/lib/grme-session";
 import { UserRole } from "@/lib/grme-user";
 import { hasSupabaseConfig } from "@/lib/supabase";
 
-const encoder = new TextEncoder();
-
-async function hashPassword(password: string): Promise<string> {
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Buffer.from(hashBuffer).toString("hex");
-}
+const BCRYPT_ROUNDS = 12;
 
 function sign(payload: string): string {
   return createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
@@ -57,11 +52,12 @@ async function verifyLogin(
   const normalizedName = name.trim();
   if (!normalizedName) return null;
 
+  // Admin: compare against server-only bcrypt hash
   if (role === "admin") {
-    const expected = process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH || "";
+    const expected = process.env.ADMIN_PASSWORD_HASH || "";
     if (!expected || !password) return null;
-    const hash = await hashPassword(password);
-    if (hash !== expected) return null;
+    const valid = await bcrypt.compare(password, expected);
+    if (!valid) return null;
     return { name: normalizedName, role: "admin", loginAt: new Date().toISOString() };
   }
 
@@ -74,8 +70,8 @@ async function verifyLogin(
 
   if (found) {
     if (!password) return null;
-    const hash = await hashPassword(password);
-    if (hash !== found.passwordHash) return null;
+    const valid = await bcrypt.compare(password, found.passwordHash);
+    if (!valid) return null;
     return { name: found.name, role: found.role, loginAt: new Date().toISOString() };
   }
 

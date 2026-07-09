@@ -11,8 +11,6 @@ export interface GrmeUser {
 }
 
 const STORAGE_KEY = "grme-user";
-const ADMIN_PASSWORD_HASH =
-  process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH || "";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Admin",
@@ -57,48 +55,6 @@ export function canEnterData(role: UserRole): boolean {
 
 export function canReviewProposals(role: UserRole): boolean {
   return role === "admin";
-}
-
-// ── Password Verification (SHA-256 via Web Crypto) ──────────────
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-export async function verifyAdminPassword(password: string): Promise<boolean> {
-  if (!ADMIN_PASSWORD_HASH) return false;
-  const hash = await hashPassword(password);
-  return hash === ADMIN_PASSWORD_HASH;
-}
-
-export function isPasswordConfigured(): boolean {
-  return ADMIN_PASSWORD_HASH.length > 0;
-}
-
-// ── User Storage ────────────────────────────────────────────────
-
-export function loadUser(): GrmeUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeUser(JSON.parse(raw)) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveUser(user: GrmeUser): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-}
-
-export function clearUser(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(STORAGE_KEY);
 }
 
 async function loadSessionUser(): Promise<GrmeUser | null> {
@@ -149,8 +105,6 @@ async function clearSessionUser(): Promise<void> {
   }
 }
 
-// ── Hook ────────────────────────────────────────────────────────
-
 export function useGrmeUser() {
   const [user, setUser] = useState<GrmeUser | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -163,9 +117,6 @@ export function useGrmeUser() {
       if (cancelled) return;
       if (sessionUser) {
         setUser(sessionUser);
-        saveUser(sessionUser);
-      } else {
-        setUser(loadUser());
       }
       setLoaded(true);
     }
@@ -179,14 +130,12 @@ export function useGrmeUser() {
   const login = useCallback(async (name: string, role: UserRole, password?: string) => {
     const result = await saveSessionUser(name.trim(), role, password);
     if (!result.success || !result.user) return result;
-    saveUser(result.user);
     setUser(result.user);
     return result;
   }, []);
 
   const logout = useCallback(() => {
     clearSessionUser().catch(() => {});
-    clearUser();
     setUser(null);
   }, []);
 
@@ -194,7 +143,6 @@ export function useGrmeUser() {
     (role: UserRole) => {
       if (!user) return;
       const updated = { ...user, role };
-      saveUser(updated);
       setUser(updated);
       fetch("/api/grme/session", {
         method: "POST",
