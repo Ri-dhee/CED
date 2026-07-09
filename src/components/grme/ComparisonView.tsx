@@ -176,7 +176,7 @@ export default function ComparisonView({
               tick={{ fontSize: 11, fill: "#6b7280" }}
               axisLine={false}
               tickLine={false}
-              width={60}
+              width={40}
             />
             <Tooltip content={<ChartTooltip />} />
             <Legend />

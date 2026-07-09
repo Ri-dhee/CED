@@ -184,7 +184,7 @@ export default function DataEntryForm({
             {showBenchmark ? "Hide" : "Show"} benchmark targets
           </button>
           {showBenchmark && (
-            <div className="grid grid-cols-4 gap-2 mt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
               {(["critical", "developing", "progressive", "exemplary"] as const).map(
                 (level) => {
                   const levelStatus = level.charAt(0).toUpperCase() + level.slice(1) as "Critical" | "Developing" | "Progressive" | "Exemplary";
