@@ -2,16 +2,16 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    - cron: '0 0 */3 * *'  # Every 3 days at midnight
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '0 12 */3 * *'  # Every 3 days at noon UTC (before 7-day pause)
+  workflow_dispatch:
 
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase DB
         run: |
-          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/assessment_data?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" > /dev/null
+          curl -s "https://ecmbnxjilkwajflixhtt.supabase.co/rest/v1/assessment_data?select=id&limit=1" \
+            -H "apikey: sb_publishable_1ecSx93HJlWFolyPiwYjnA_GzDURKSN" \
+            -H "Authorization: Bearer sb_publishable_1ecSx93HJlWFolyPiwYjnA_GzDURKSN" > /dev/null
           echo "Supabase pinged successfully"
