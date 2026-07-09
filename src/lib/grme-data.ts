@@ -1551,5 +1551,4 @@ export function getAllIndicators(): (Indicator & { domainId: string; subdomainId
   );
 }
 
-/** @deprecated Use DEFAULT_DOMAINS or pass domains as a prop instead. */
-export const DOMAINS = DEFAULT_DOMAINS;
+

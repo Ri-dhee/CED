@@ -84,7 +84,7 @@ export default function RootLayout({
                 "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
               contactPoint: {
                 "@type": "ContactPoint",
-                telephone: "+1-555-123-4567",
+                telephone: "+975-2-324456",
                 contactType: "customer service",
                 email: "contact@ced-consult.com",
               },

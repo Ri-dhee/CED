@@ -6,6 +6,7 @@ import {
   DataType,
   Direction,
   Benchmark,
+  DEFAULT_DOMAINS,
 } from "./grme-data";
 import * as api from "./grme-api";
 
@@ -174,22 +175,7 @@ export function cacheFramework(fw: FrameworkStorage): void {
 // ── Default Framework ───────────────────────────────────────────
 
 export function getDefaultFramework(): Domain[] {
-  // Deep clone the static DOMAINS from grme-data
-  // This avoids circular imports — we just re-export the same data
-  return getDefaultDomains();
-}
-
-// Lazy import to avoid circular dependency
-let _cachedDefaults: Domain[] | null = null;
-function getDefaultDomains(): Domain[] {
-  if (_cachedDefaults) return _cachedDefaults;
-  // Use dynamic import for browser compatibility
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { DEFAULT_DOMAINS } = require("./grme-data") as {
-    DEFAULT_DOMAINS: Domain[];
-  };
-  _cachedDefaults = JSON.parse(JSON.stringify(DEFAULT_DOMAINS));
-  return _cachedDefaults!;
+  return JSON.parse(JSON.stringify(DEFAULT_DOMAINS));
 }
 
 // ── Entity Lookups ──────────────────────────────────────────────

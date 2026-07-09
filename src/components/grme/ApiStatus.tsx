@@ -155,7 +155,7 @@ export default function ApiStatus({ apiAvailable, onRefresh }: ApiStatusProps) {
     <button
       onClick={handleRefresh}
       className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
-      title="Click to refresh data from Google Sheets"
+      title="Refresh data"
     >
       <div className={`w-1.5 h-1.5 rounded-full ${refreshing ? "bg-blue-400 animate-pulse" : dotColor}`} />
       <span className="text-gray-500">{refreshing ? "Refreshing..." : label}</span>

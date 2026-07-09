@@ -273,7 +273,7 @@ export function useGRMEFramework() {
     [domains, proposals, persist]
   );
 
-  // ── Direct Update (spreadsheet inline editing) ──────────────
+  // ── Direct Update (inline editor) ───────────────────────────
 
   const updateDomainField = useCallback(
     (domainId: string, field: string, value: string) => {
@@ -415,7 +415,7 @@ export function useGRMEFramework() {
     [domains, proposals]
   );
 
-  // ── Direct Add (spreadsheet) ────────────────────────────────
+  // ── Direct Add (inline editor) ──────────────────────────────
 
   const addDomainDirect = useCallback(() => {
     const d = newDomain();
@@ -470,7 +470,7 @@ export function useGRMEFramework() {
     [domains, proposals]
   );
 
-  // ── Direct Delete (spreadsheet) ─────────────────────────────
+  // ── Direct Delete (inline editor) ───────────────────────────
 
   const deleteDomainDirect = useCallback(
     (domainId: string) => {
@@ -662,7 +662,7 @@ export function useGRMEFramework() {
     newIndicator,
     generateEntityId,
 
-    // Direct spreadsheet updates
+    // Direct inline editor updates
     updateDomainField,
     updateSubDomainField,
     updateIndicatorField,
