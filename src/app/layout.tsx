@@ -19,12 +19,12 @@ export const metadata: Metadata = {
   title: "CED | Center for Environment & Development",
   description:
     "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
-  metadataBase: new URL("https://ced-consult.vercel.app"),
+  metadataBase: new URL("https://ced-neon.vercel.app"),
   openGraph: {
     title: "CED | Center for Environment & Development",
     description:
       "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
-    url: "https://ced-consult.vercel.app",
+    url: "https://ced-neon.vercel.app",
     siteName: "CED",
     locale: "en_US",
     type: "website",
@@ -78,8 +78,8 @@ export default function RootLayout({
               "@type": "Organization",
               name: "Center for Environment & Development",
               alternateName: "CED",
-              url: "https://ced-consult.vercel.app",
-              logo: "https://ced-consult.vercel.app/logo.png",
+              url: "https://ced-neon.vercel.app",
+              logo: "https://ced-neon.vercel.app/logo.png",
               description:
                 "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
               contactPoint: {
