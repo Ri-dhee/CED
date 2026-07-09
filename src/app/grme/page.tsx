@@ -1074,6 +1074,7 @@ function PublicDashboard({
         framework.domains.map((domain) => [domain.id, getDomainScoreForYear(domain.id, previousYear)])
       )
     : null;
+  const cleanLabel = (value: string) => value.replace(/\s*\(\?\)/g, "").trim();
   const statusCopy =
     overallStatus === "Exemplary"
       ? "Strong overall performance"
@@ -1160,12 +1161,12 @@ function PublicDashboard({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Strongest area</div>
-          <div className="mt-2 text-sm font-bold text-gray-900">{strongest?.domain.shortName || "No data"}</div>
+          <div className="mt-2 text-sm font-bold text-gray-900">{strongest ? cleanLabel(strongest.domain.shortName) : "No data"}</div>
           <div className="text-xs text-gray-500">{strongest ? `${Math.round(strongest.score)} points` : "Enter data to rank areas"}</div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Needs attention</div>
-          <div className="mt-2 text-sm font-bold text-gray-900">{weakest?.domain.shortName || "No data"}</div>
+          <div className="mt-2 text-sm font-bold text-gray-900">{weakest ? cleanLabel(weakest.domain.shortName) : "No data"}</div>
           <div className="text-xs text-gray-500">{weakest ? `${Math.round(weakest.score)} points` : "Enter data to identify gaps"}</div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -1176,7 +1177,7 @@ function PublicDashboard({
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Year-over-year</div>
           <div className="mt-2 text-sm font-bold text-gray-900">{overallChange === null ? "Add a prior year" : `${overallChange > 0 ? "+" : ""}${overallChange} pts`}</div>
-          <div className="text-xs text-gray-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Comparison appears after a second year is added"}</div>
+          <div className="text-xs text-gray-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Shown after a second year is added"}</div>
         </div>
       </div>
 
@@ -1251,7 +1252,7 @@ function PublicDashboard({
         </div>
       )}
 
-      {framework.domains.length > 0 && (
+      {showDetails && framework.domains.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
           {topDomains.map(({ domain, score }) => (
             <div key={domain.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
