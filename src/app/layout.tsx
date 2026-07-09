@@ -45,10 +45,12 @@ export const metadata: Metadata = {
 
 const navLinks = [
   { href: "/", label: "Home" },
+  { href: "/about", label: "About" },
+  { href: "/experts", label: "Experts" },
   {
     label: "Experience",
     children: [
-      { href: "/experience", label: "Experience" },
+      { href: "/experience", label: "Experience & Projects" },
       { href: "/grme", label: "GRME Index" },
     ],
   },
