@@ -51,10 +51,6 @@ export function canEnterData(role: UserRole): boolean {
   return role === "admin" || role === "editor";
 }
 
-export function canReviewProposals(role: UserRole): boolean {
-  return role === "admin";
-}
-
 async function loadSessionUser(): Promise<GrmeUser | null> {
   try {
     const res = await fetch("/api/grme/session", { credentials: "include" });

@@ -17,6 +17,7 @@ import {
   calculateWeightedOverallScore,
   SCORING_ENGINE_VERSION,
   computeBenchmarkSnapshotId,
+  deepClone,
 } from "./grme-data";
 import * as api from "./grme-api";
 import { supabase, hasSupabaseConfig } from "./supabase";
@@ -301,9 +302,7 @@ function applyPendingMutationsToData(
   return next;
 }
 
-function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
-}
+// deepClone imported from grme-data
 
 /** Replay all pending offline mutations to Supabase. */
 async function drainQueue(): Promise<void> {

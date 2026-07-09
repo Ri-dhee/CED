@@ -403,13 +403,6 @@ export function calculateDomainScore(
 /**
  * Calculate overall score using geometric mean of domain scores.
  */
-export function calculateOverallScore(
-  getDomainScore: (id: string) => number
-): number {
-  const scores = DEFAULT_DOMAINS.map((d) => getDomainScore(d.id));
-  return geometricMean(scores);
-}
-
 export function calculateWeightedOverallScore(
   domains: Domain[],
   getDomainScore: (id: string) => number
@@ -422,18 +415,6 @@ export function calculateWeightedOverallScore(
     items.map((item) => item.score),
     items.map((item) => item.weight)
   );
-}
-
-/**
- * Get benchmark thresholds as numeric values
- */
-export function getBenchmarkValues(indicator: Indicator) {
-  return {
-    critical: parseFloat(indicator.benchmark.critical),
-    developing: parseFloat(indicator.benchmark.developing),
-    progressive: parseFloat(indicator.benchmark.progressive),
-    exemplary: parseFloat(indicator.benchmark.exemplary),
-  };
 }
 
 /**
@@ -1539,16 +1520,7 @@ export const CITIES: { id: string; name: string }[] = [
   { id: "paro", name: "Paro" },
 ];
 
-export function getAllIndicators(): (Indicator & { domainId: string; subdomainId: string })[] {
-  return DEFAULT_DOMAINS.flatMap((d) =>
-    d.subdomains.flatMap((s) =>
-      s.indicators.map((i) => ({
-        ...i,
-        domainId: d.id,
-        subdomainId: s.id,
-      }))
-    )
-  );
+/** Deep-clone a value via structured clone (available in modern runtimes). */
+export function deepClone<T>(obj: T): T {
+  return structuredClone(obj);
 }
-
-

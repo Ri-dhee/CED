@@ -11,6 +11,7 @@ import {
   CityData,
   IndicatorData,
   AuditEntry,
+  CITIES,
 } from "./grme-data";
 import { FrameworkStorage } from "./grme-framework";
 import { ManagedUser } from "./grme-managed-users";
@@ -294,17 +295,6 @@ export async function saveUsers(users: ManagedUser[]): Promise<void> {
   if (error) throw error;
 }
 
-// ── Health check ─────────────────────────────────────────────────
-
-export async function healthCheck(): Promise<boolean> {
-  try {
-    const { error } = await supabase().from("config").select("key").limit(1);
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
 // ── Helpers ──────────────────────────────────────────────────────
 
 function parseValue(val: unknown): number | string | boolean | null {
@@ -320,13 +310,7 @@ function parseValue(val: unknown): number | string | boolean | null {
 }
 
 function getCityName(cityId: string): string {
-  const cities: Record<string, string> = {
-    thimphu: "Thimphu",
-    phuntsholing: "Phuntsholing",
-    gelephu: "Gelephu",
-    paro: "Paro",
-  };
-  return cities[cityId] || cityId;
+  return CITIES.find((c) => c.id === cityId)?.name || cityId;
 }
 
 // ── Queue status ────────────────────────────────────────────────

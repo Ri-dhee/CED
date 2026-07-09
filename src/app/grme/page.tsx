@@ -31,6 +31,7 @@ import YearSelector from "@/components/grme/YearSelector";
 import TrendChart from "@/components/grme/TrendChart";
 import UserManagement from "@/components/grme/UserManagement";
 import ApiStatus, { SyncProvider, useSync } from "@/components/grme/ApiStatus";
+import ErrorBoundary from "@/components/grme/ErrorBoundary";
 import { resolveOverlayYears } from "@/lib/grme-overlays";
 
 type Tab = "dashboard" | "entry" | "framework" | "audit";
@@ -55,7 +56,9 @@ export default function GRMEPage() {
 
   return (
     <SyncProvider>
-      <GRMEApp user={user} onSwitchRole={switchRole} onLogout={logout} />
+      <ErrorBoundary>
+        <GRMEApp user={user} onSwitchRole={switchRole} onLogout={logout} />
+      </ErrorBoundary>
     </SyncProvider>
   );
 }
@@ -230,7 +233,6 @@ function GRMEApp({
 
   const overallScore = useMemo(() => getOverallScore(), [getOverallScore]);
   const stats = useMemo(() => getDataEntryStats(), [getDataEntryStats]);
-  const currentStats = stats;
   const comparisonStats = useMemo(
     () => (comparisonYear ? getDataEntryStatsForYear(comparisonYear) : null),
     [comparisonYear, getDataEntryStatsForYear]
@@ -485,17 +487,17 @@ function GRMEApp({
                   previousScore={
                     previousYear ? getScoreForYear(previousYear) : null
                   }
-                  confidence={currentStats.confidence}
+                  confidence={stats.confidence}
                   size="xl"
                   showGrade
                   showTrend
                 />
                 <div className="mt-4 text-center">
                   <div className="text-xs font-medium text-gray-500">
-                    Confidence {currentStats.confidence}%
+                    Confidence {stats.confidence}%
                   </div>
                   <div className="text-[11px] text-gray-400 mt-1">
-                    Based on {currentStats.filled}/{currentStats.total} indicators
+                    Based on {stats.filled}/{stats.total} indicators
                   </div>
                 </div>
               </div>
@@ -631,9 +633,9 @@ function GRMEApp({
                 getDomainScoreForYear={getDomainScoreForYear}
                 selectedYear={selectedYear}
                 availableYears={availableYears}
-                confidence={currentStats.confidence}
-                filled={currentStats.filled}
-                total={currentStats.total}
+                confidence={stats.confidence}
+                filled={stats.filled}
+                total={stats.total}
               />
             </div>
 
@@ -671,7 +673,7 @@ function GRMEApp({
             {/* ═══ COMPARISON ROW (2+ years) ═══ */}
             {availableYears.length >= 2 && comparisonYear && overlayMode !== "all" && (
               <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                {comparisonStats && (currentStats.confidence < 80 || comparisonStats.confidence < 80) && (
+                {comparisonStats && (stats.confidence < 80 || comparisonStats.confidence < 80) && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     This comparison is preliminary because one or both years have incomplete data.
                   </div>

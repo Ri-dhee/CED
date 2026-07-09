@@ -7,6 +7,7 @@ import {
   Direction,
   Benchmark,
   DEFAULT_DOMAINS,
+  deepClone,
 } from "./grme-data";
 import * as api from "./grme-api";
 
@@ -175,7 +176,7 @@ export function cacheFramework(fw: FrameworkStorage): void {
 // ── Default Framework ───────────────────────────────────────────
 
 export function getDefaultFramework(): Domain[] {
-  return JSON.parse(JSON.stringify(DEFAULT_DOMAINS));
+  return deepClone(DEFAULT_DOMAINS);
 }
 
 // ── Entity Lookups ──────────────────────────────────────────────
@@ -247,7 +248,7 @@ export function applyProposal(
   domains: Domain[],
   proposal: FrameworkProposal
 ): Domain[] {
-  const clone = JSON.parse(JSON.stringify(domains)) as Domain[];
+  const clone = deepClone(domains);
 
   switch (proposal.entity) {
     case "domain":
@@ -358,10 +359,8 @@ export function createProposal(
     action,
     entity,
     entityPath,
-    data: JSON.parse(JSON.stringify(data)),
-    originalData: originalData
-      ? JSON.parse(JSON.stringify(originalData))
-      : undefined,
+    data: deepClone(data),
+    originalData: originalData ? deepClone(originalData) : undefined,
     status: "pending",
   };
 }
@@ -389,15 +388,15 @@ export function getProposalSummary(p: FrameworkProposal): string {
 // ── Clone helpers for forms ─────────────────────────────────────
 
 export function cloneDomain(d: Domain): Domain {
-  return JSON.parse(JSON.stringify(d));
+  return deepClone(d);
 }
 
 export function cloneSubDomain(s: SubDomain): SubDomain {
-  return JSON.parse(JSON.stringify(s));
+  return deepClone(s);
 }
 
 export function cloneIndicator(i: Indicator): Indicator {
-  return JSON.parse(JSON.stringify(i));
+  return deepClone(i);
 }
 
 // ── New entity factories ────────────────────────────────────────
