@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import logoCed from "../../../logo_ced.png";
 import {
   UserRole,
   ROLE_LABELS,
@@ -95,8 +97,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium mb-4 border border-primary/10">
-            <span className="w-2 h-2 bg-primary rounded-full mr-2 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium mb-4 border border-primary/10">
+            <Image
+              src={logoCed}
+              alt="CED logo"
+              width={20}
+              height={20}
+              className="h-5 w-5 rounded-sm object-contain"
+            />
             GRME Index
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">

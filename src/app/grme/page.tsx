@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import Image from "next/image";
 import {
   getStatusFromScore,
   getStatusColor,
@@ -35,6 +36,7 @@ import UserManagement from "@/components/grme/UserManagement";
 import ApiStatus, { SyncProvider, useSync } from "@/components/grme/ApiStatus";
 import ErrorBoundary from "@/components/grme/ErrorBoundary";
 import { resolveOverlayYears } from "@/lib/grme-overlays";
+import logoCed from "../../../logo_ced.png";
 
 type Tab = "dashboard" | "entry" | "framework" | "audit";
 const YEAR_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#0ea5e9", "#14b8a6"];
@@ -348,8 +350,14 @@ function GRMEApp({
       <section className="pt-28 sm:pt-36 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium mb-6 border border-primary/10">
-              <span className="w-2 h-2 bg-primary rounded-full mr-2 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium mb-6 border border-primary/10">
+              <Image
+                src={logoCed}
+                alt="CED logo"
+                width={18}
+                height={18}
+                className="h-[18px] w-[18px] rounded-sm object-contain"
+              />
               Dynamic Assessment Dashboard
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
