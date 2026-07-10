@@ -1460,6 +1460,7 @@ export function useGRMEData(
     selectedThromdeId: validSelectedThromdeId,
     setSelectedThromdeId,
     dzongkhags,
+    thromdes,
     availableThromdes,
     selectedThromde,
     selectedYear: currentYear,

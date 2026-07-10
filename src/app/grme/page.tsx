@@ -29,6 +29,7 @@ import LoginScreen from "@/components/grme/LoginScreen";
 import UserBadge from "@/components/grme/UserBadge";
 import YearSelector from "@/components/grme/YearSelector";
 import TrendChart from "@/components/grme/TrendChart";
+import LocationManagement from "@/components/grme/LocationManagement";
 import UserManagement from "@/components/grme/UserManagement";
 import ApiStatus, { SyncProvider, useSync } from "@/components/grme/ApiStatus";
 import ErrorBoundary from "@/components/grme/ErrorBoundary";
@@ -87,6 +88,7 @@ function GRMEApp({
     selectedThromdeId,
     setSelectedThromdeId,
     dzongkhags,
+    thromdes,
     availableThromdes,
     availableYears,
     createYear,
@@ -1003,6 +1005,14 @@ function GRMEApp({
       {activeTab === "framework" && isAdmin && (
         <section className="pb-12" role="tabpanel" id="panel-framework" aria-labelledby="tab-framework">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="mb-6">
+              <LocationManagement
+                dzongkhags={dzongkhags}
+                thromdes={thromdes}
+                adminName={user.name}
+                onRefreshData={refreshData}
+              />
+            </div>
             <FrameworkEditor
               domains={framework.domains}
               pendingProposals={framework.pendingProposals}
@@ -1071,6 +1081,8 @@ function GRMEApp({
           adminName={user.name}
           onRefreshData={refreshData}
           domains={framework.domains}
+          dzongkhags={dzongkhags}
+          thromdes={thromdes}
         />
       )}
     </div>
