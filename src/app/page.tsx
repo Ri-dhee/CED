@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import logoCed from "../../logo_ced.png";
 
 const services = [
   {
@@ -94,8 +96,14 @@ export default function Home() {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/20 rounded-[40px]" />
                 <div className="absolute top-10 right-10 w-40 h-40 bg-gradient-to-br from-primary to-primary-light rounded-[24px] shadow-2xl shadow-primary/20" />
                 <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-br from-accent to-accent-light rounded-[24px] shadow-2xl shadow-accent/20" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-gradient-to-br from-emerald-50 to-white rounded-[32px] shadow-2xl border border-white/50 flex items-center justify-center backdrop-blur">
-                  <span className="text-6xl font-bold text-primary/30">CED</span>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-gradient-to-br from-emerald-50 to-white rounded-[32px] shadow-2xl border border-white/50 flex items-center justify-center backdrop-blur overflow-hidden">
+                  <Image
+                    src={logoCed}
+                    alt="CED logo"
+                    width={160}
+                    height={160}
+                    className="h-full w-full object-contain p-4"
+                  />
                 </div>
               </div>
             </div>
