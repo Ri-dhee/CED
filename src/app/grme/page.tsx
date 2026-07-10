@@ -9,7 +9,7 @@ import {
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
-import { useGrmeUser, canEditFramework, canEnterData, canAccessDzongkhag, getAccessibleDzongkhags, GrmeUser } from "@/lib/grme-user";
+import { useGrmeUser, canEditFramework, canAccessDzongkhag, getAccessibleDzongkhags, GrmeUser, canEnterDataDuringWindow } from "@/lib/grme-user";
 import {
   exportYearCsv,
   exportAllYearsCsv,
@@ -100,6 +100,9 @@ function GRMEApp({
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,
+    adminEvents,
+    syncError,
+    dataEntryWindow,
     loading,
     refreshData,
   } = useGRMEData(framework.domains, user.name, selectedYear, user);
@@ -279,7 +282,8 @@ function GRMEApp({
   }, [framework.domains, getDomainScoreForYear, overlayYears]);
 
   const isAdmin = canEditFramework(user.role);
-  const canEdit = canEnterData(user.role) && canAccessDzongkhag(user, selectedCity);
+  const dataEntryOpen = canEnterDataDuringWindow(user, dataEntryWindow);
+  const canEdit = dataEntryOpen && canAccessDzongkhag(user, selectedCity);
   const accessibleDzongkhags = getAccessibleDzongkhags(user);
   const currentScopeLabel = selectedThromdeId
     ? `Thromde: ${availableThromdes.find((t) => t.id === selectedThromdeId)?.name || selectedThromdeId}`
@@ -407,6 +411,15 @@ function GRMEApp({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <div className={`hidden sm:flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-medium ${dataEntryOpen ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${dataEntryOpen ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    <span>{dataEntryOpen ? "Data entry open" : "Data entry closed"}</span>
+                    {dataEntryWindow?.enabled && dataEntryWindow.startAt && dataEntryWindow.endAt && (
+                      <span className="text-gray-500">{new Date(dataEntryWindow.startAt).toLocaleDateString()} - {new Date(dataEntryWindow.endAt).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                )}
                 <ApiStatus apiAvailable={apiAvailable} onRefresh={refreshData} />
                 {isAdmin && (
                   <button
@@ -435,6 +448,22 @@ function GRMEApp({
       {/* Tab Navigation */}
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {!isAdmin && !dataEntryOpen && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Data entry is currently closed. Admins can open it for a specific time window.
+            </div>
+          )}
+          {syncError && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-3">
+              <span>{syncError}</span>
+              <button
+                onClick={refreshData}
+                className="shrink-0 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
+              >
+                Retry sync
+              </button>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap" role="tablist" aria-label="GRME sections">
             {((isPublicView
               ? [
@@ -992,13 +1021,45 @@ function GRMEApp({
               auditLog={assessment.auditLog}
               onAddNote={trackedAddAuditNote}
             />
+            {isAdmin && adminEvents.length > 0 && (
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">Admin Events</h3>
+                  <span className="text-sm text-gray-400">{adminEvents.length} entries</span>
+                </div>
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {adminEvents.slice(0).reverse().map((log, index) => (
+                    <div key={`${log.indicatorId}-${index}`} className="rounded-xl bg-slate-50 p-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-slate-800">{log.indicatorId}</span>
+                        <span className="text-xs text-slate-500">{log.entries.length} actions</span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-slate-600">
+                        {log.entries.slice(-3).map((entry) => (
+                          <div key={entry.id || entry.timestamp} className="flex items-center justify-between gap-3">
+                            <span>{entry.user} · {entry.action}</span>
+                            <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
 
       {/* User Management Modal */}
       {showUserManagement && isAdmin && (
-        <UserManagement onClose={() => setShowUserManagement(false)} />
+        <UserManagement
+          onClose={() => setShowUserManagement(false)}
+          dataEntryWindow={dataEntryWindow}
+          adminEvents={adminEvents}
+          adminName={user.name}
+          onRefreshData={refreshData}
+        />
       )}
     </div>
   );

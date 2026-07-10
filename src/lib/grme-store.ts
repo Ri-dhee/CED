@@ -22,8 +22,8 @@ import {
   deepClone,
 } from "./grme-data";
 import * as api from "./grme-api";
-import { supabase, hasSupabaseConfig } from "./supabase";
-import { GrmeUser, canAccessDzongkhag, canAccessIndicator, canEnterData, getAccessibleDzongkhags } from "./grme-user";
+import { supabase, hasSupabaseConfig, isStrictFreeTierMode } from "./supabase";
+import { DataEntryWindowConfig, GrmeUser, canAccessDzongkhag, canAccessIndicator, canEnterDataDuringWindow, getAccessibleDzongkhags } from "./grme-user";
 
 const STORAGE_KEY = "grme-data";
 const MIGRATION_SENTINEL_KEY = "grme-migration-v1";
@@ -210,6 +210,7 @@ interface PendingMutation {
   cityId: string;
   year: number;
   thromdeId?: string;
+  actor?: string;
   indicatorId?: string;
   data?: IndicatorData;
   entry?: AuditEntry;
@@ -250,23 +251,21 @@ function saveQueue(queue: PendingMutation[]): void {
 
 function enqueueMutation(mutation: PendingMutation): void {
   const queue = loadQueue();
-  const key = mutation.type === "saveIndicator" || mutation.type === "addAuditEntry"
-    ? `${mutation.cityId}:${mutation.thromdeId || "dz"}:${mutation.year}:${mutation.indicatorId}`
-    : `${mutation.type}:${mutation.cityId}:${mutation.thromdeId || "dz"}:${mutation.year}`;
 
+  if (mutation.type === "addAuditEntry") {
+    queue.push(mutation);
+    saveQueue(queue);
+    return;
+  }
+
+  const key = `${mutation.type}:${mutation.cityId}:${mutation.thromdeId || "dz"}:${mutation.year}`;
   const idx = queue.findIndex((m) => {
     if (m.type !== mutation.type) return false;
-    if (m.type === "saveIndicator" || m.type === "addAuditEntry") {
-      return `${m.cityId}:${m.thromdeId || "dz"}:${m.year}:${m.indicatorId}` === key;
-    }
     return `${m.type}:${m.cityId}:${m.thromdeId || "dz"}:${m.year}` === key;
   });
 
-  if (idx >= 0) {
-    queue[idx] = mutation;
-  } else {
-    queue.push(mutation);
-  }
+  if (idx >= 0) queue[idx] = mutation;
+  else queue.push(mutation);
   saveQueue(queue);
 }
 
@@ -344,22 +343,22 @@ function applyPendingMutationsToData(
 // deepClone imported from grme-data
 
 /** Replay all pending offline mutations to Supabase. */
-async function drainQueue(): Promise<void> {
+async function drainQueue(): Promise<number> {
   const queue = loadQueue();
-  if (queue.length === 0) return;
+  if (queue.length === 0) return 0;
 
   const stillPending: PendingMutation[] = [];
   for (const m of queue) {
     try {
       switch (m.type) {
         case "saveIndicator":
-          if (m.data) await api.saveAssessment(m.cityId, m.year, m.indicatorId!, m.data, m.thromdeId);
+          if (m.data) await api.saveAssessment(m.cityId, m.year, m.indicatorId!, m.data, m.thromdeId, m.actor || m.data.updatedBy || "system");
           break;
         case "addAuditEntry":
           if (m.entry) await api.addAuditEntry(m.cityId, m.year, m.indicatorId!, m.entry);
           break;
         case "createYear":
-          await api.saveAssessments(m.cityId, m.year, m.indicators || {}, m.thromdeId);
+          await api.saveAssessments(m.cityId, m.year, m.indicators || {}, m.thromdeId, m.actor || "system");
           break;
         case "deleteYear":
           await api.deleteYear(m.cityId, m.year, m.thromdeId);
@@ -371,6 +370,7 @@ async function drainQueue(): Promise<void> {
     }
   }
   saveQueue(stillPending);
+  return stillPending.length;
 }
 
 /** In a multi-stakeholder system the server is the source of truth.
@@ -569,12 +569,18 @@ export function useGRMEData(
   const queueFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queueFlushPromiseRef = useRef<Promise<void> | null>(null);
   const queueFlushResolveRef = useRef<(() => void) | null>(null);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const lastAuditCityRef = useRef<string | null>(null);
+  const lastAutoRefreshAtRef = useRef<number>(0);
 
   const [allData, setAllData] = useState<Record<string, CityData>>({});
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
   const [selectedThromdeId, setSelectedThromdeId] = useState<string>("");
   const [thromdes, setThromdes] = useState<Thromde[]>([]);
   const [apiAvailable, setApiAvailable] = useState<boolean>(false);
+  const [adminEvents, setAdminEvents] = useState<AuditLog[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [dataEntryWindow, setDataEntryWindow] = useState<DataEntryWindowConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const domainsRef = useRef(domains);
   const currentUser = userName || "Stakeholder";
@@ -604,7 +610,8 @@ export function useGRMEData(
     if (queueFlushTimerRef.current) clearTimeout(queueFlushTimerRef.current);
     queueFlushTimerRef.current = setTimeout(async () => {
       try {
-        await drainQueue();
+        const pending = await drainQueue();
+        setSyncError(pending > 0 ? `${pending} change${pending === 1 ? "" : "s"} still waiting to sync.` : null);
       } finally {
         const resolve = queueFlushResolveRef.current;
         queueFlushResolveRef.current = null;
@@ -621,40 +628,64 @@ export function useGRMEData(
   // Prevents cascading refreshes when multiple mutations fire rapidly.
 
   const refreshData = useCallback(async () => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+
+    const run = (async () => {
     if (!hasSupabaseConfig) {
       const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
       saveAllData(localData);
       setAllData(localData);
       setThromdes([]);
       setApiAvailable(false);
+      setSyncError(null);
+      setDataEntryWindow(null);
+      lastAutoRefreshAtRef.current = Date.now();
       return;
     }
     try {
-      const apiData = await api.loadAssessments();
+      const apiData = await api.loadAssessments(activeCityId);
       const apiThromdes = await api.loadThromdes().catch(() => []);
+      const windowConfig = await api.loadDataEntryWindowConfig().catch(() => null);
       const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
       const localData = loadAllData();
       // Server is source of truth; local fills gaps (cities/years not in Supabase)
       let merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
 
-      const auditLogs = await api.loadAuditLogsForAssessment();
+      const auditLogs = await api.loadAuditLogsForAssessment(activeCityId);
       merged = mergeAuditLogsIntoData(merged, auditLogs);
+
+      if (user?.role === "admin") {
+        setAdminEvents(await api.loadAdminEvents());
+      }
 
       // Overlay pending offline mutations so they still display before syncing
       merged = applyPendingMutationsToData(merged);
 
       setAllData(merged);
       setThromdes(apiThromdes);
+      setDataEntryWindow(windowConfig);
       saveAllData(merged);
       setApiAvailable(true);
-      await drainQueue();
+      lastAutoRefreshAtRef.current = Date.now();
+      const pending = await drainQueue();
+      setSyncError(pending > 0 ? `${pending} change${pending === 1 ? "" : "s"} still waiting to sync.` : null);
     } catch {
       setThromdes([]);
       setApiAvailable(false);
+      setDataEntryWindow(null);
+      setSyncError("Unable to sync with the server right now. Changes remain saved locally.");
     }
-  }, []);
+    })();
+
+    refreshPromiseRef.current = run.finally(() => {
+      refreshPromiseRef.current = null;
+    });
+
+    return refreshPromiseRef.current;
+  }, [activeCityId]);
 
   const debouncedRefresh = useCallback(() => {
+    if (Date.now() - lastAutoRefreshAtRef.current < 30000) return;
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => {
       refreshData();
@@ -681,29 +712,39 @@ export function useGRMEData(
           setAllData(localData);
           setThromdes([]);
           setApiAvailable(false);
+          setAdminEvents([]);
+          setSyncError(null);
+          setDataEntryWindow(null);
           setLoading(false);
         }
         return;
       }
       try {
-        const apiData = await api.loadAssessments();
+        const apiData = await api.loadAssessments(activeCityId);
         const apiThromdes = await api.loadThromdes().catch(() => []);
+        const windowConfig = await api.loadDataEntryWindowConfig().catch(() => null);
         if (!cancelled) {
           const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
           const localData = loadAllData();
           let merged = backfillScoringMetadata(mergeDataSources(reconciled, localData), domainsRef.current);
 
-          const auditLogs = await api.loadAuditLogsForAssessment();
+          const auditLogs = await api.loadAuditLogsForAssessment(activeCityId);
           merged = mergeAuditLogsIntoData(merged, auditLogs);
+
+          if (user?.role === "admin") {
+            setAdminEvents(await api.loadAdminEvents());
+          }
 
           merged = applyPendingMutationsToData(merged);
 
           setAllData(merged);
           setThromdes(apiThromdes);
+          setDataEntryWindow(windowConfig);
           saveAllData(merged);
           setApiAvailable(true);
           setLoading(false);
-          await drainQueue();
+          const pending = await drainQueue();
+          setSyncError(pending > 0 ? `${pending} change${pending === 1 ? "" : "s"} still waiting to sync.` : null);
         }
       } catch {
         if (!cancelled) {
@@ -713,6 +754,9 @@ export function useGRMEData(
           setAllData(withPending);
           setThromdes([]);
           setApiAvailable(false);
+          setAdminEvents([]);
+          setSyncError("Unable to sync with the server right now. Changes remain saved locally.");
+          setDataEntryWindow(null);
           setLoading(false);
         }
       }
@@ -721,6 +765,17 @@ export function useGRMEData(
     init();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!apiAvailable) return;
+    if (lastAuditCityRef.current === null) {
+      lastAuditCityRef.current = activeCityId;
+      return;
+    }
+    if (lastAuditCityRef.current === activeCityId) return;
+    lastAuditCityRef.current = activeCityId;
+    debouncedRefresh();
+  }, [activeCityId, apiAvailable, debouncedRefresh]);
 
   useEffect(() => {
     setAllData((prev) => {
@@ -732,7 +787,7 @@ export function useGRMEData(
 
   // Real-time subscription — auto-refresh when data changes in Supabase
   useEffect(() => {
-    if (!hasSupabaseConfig) return;
+    if (!hasSupabaseConfig || isStrictFreeTierMode) return;
     const channel = supabase()
       .channel("assessment-changes")
       .on(
@@ -751,6 +806,7 @@ export function useGRMEData(
 
   // Refresh when window gets focus (catches any missed changes)
   useEffect(() => {
+    if (isStrictFreeTierMode) return;
     const handleFocus = () => debouncedRefresh();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
@@ -829,7 +885,7 @@ export function useGRMEData(
 
   const createYear = useCallback(
     async (year: number, copyFrom?: number) => {
-      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
       let indicators: Record<string, IndicatorData> = {};
       let auditLog: AuditLog[] = [];
 
@@ -893,20 +949,21 @@ export function useGRMEData(
         cityId: activeCityId,
         year,
         thromdeId: selectedThromde?.id,
+        actor: currentUser,
         indicators,
       });
       if (apiAvailable) {
         await scheduleQueueFlush();
       }
     },
-    [activeCityId, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
+    [activeCityId, dataEntryWindow, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Delete year ────────────────────────────────────────────
 
   const deleteYear = useCallback(
     async (year: number) => {
-      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
       const city = ensureCity(activeCityId);
       const newAssessments = { ...city.assessments };
       const nextThromdeAssessments = { ...(city.thromdeAssessments || {}) };
@@ -939,19 +996,20 @@ export function useGRMEData(
         cityId: activeCityId,
         year,
         thromdeId: selectedThromde?.id,
+        actor: currentUser,
       });
       if (apiAvailable) {
         await scheduleQueueFlush();
       }
     },
-    [activeCityId, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
+    [activeCityId, dataEntryWindow, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Update indicator ───────────────────────────────────────
 
   const updateIndicator = useCallback(
     async (indicatorId: string, value: number | string | boolean, notes?: string) => {
-      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
       const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
       if (user && indicator && !canAccessIndicator(user, indicator)) return;
       const city = ensureCity(activeCityId);
@@ -1065,14 +1123,14 @@ export function useGRMEData(
         await scheduleQueueFlush();
       }
     },
-    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
+    [activeCityId, currentYear, currentUser, dataEntryWindow, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Add audit note ─────────────────────────────────────────
 
   const addAuditNote = useCallback(
     async (indicatorId: string, note: string) => {
-      if (user && (!canEnterData(user.role) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
       const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
       if (user && indicator && !canAccessIndicator(user, indicator)) return;
       const city = ensureCity(activeCityId);
@@ -1158,7 +1216,7 @@ export function useGRMEData(
         await scheduleQueueFlush();
       }
     },
-    [activeCityId, currentYear, currentUser, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
+    [activeCityId, currentYear, currentUser, dataEntryWindow, ensureCity, apiAvailable, user, selectedThromde, scheduleQueueFlush]
   );
 
   // ── Scoring ────────────────────────────────────────────────
@@ -1410,6 +1468,9 @@ export function useGRMEData(
     getScoreForYear,
     getDomainScoreForYear,
     apiAvailable,
+    adminEvents,
+    syncError,
+    dataEntryWindow,
     loading,
     refreshData: debouncedRefresh,
   };

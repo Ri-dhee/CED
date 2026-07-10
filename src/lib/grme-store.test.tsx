@@ -79,9 +79,11 @@ const mockApiFns = {
   deleteYear: vi.fn(),
   addAuditEntry: vi.fn(),
   loadAuditLogsForAssessment: vi.fn().mockResolvedValue({}),
+  loadDataEntryWindowConfig: vi.fn().mockResolvedValue(null),
 };
 
 let supabaseHasConfig = false;
+let strictFreeTierMode = false;
 
 const mockSupabaseClient = {
   channel: vi.fn(() => ({
@@ -93,6 +95,7 @@ const mockSupabaseClient = {
 
 vi.mock("@/lib/supabase", () => ({
   get hasSupabaseConfig() { return supabaseHasConfig; },
+  get isStrictFreeTierMode() { return strictFreeTierMode; },
   supabase: vi.fn(() => mockSupabaseClient),
 }));
 
@@ -100,9 +103,9 @@ vi.mock("@/lib/grme-api", () => mockApiFns);
 
 // ── Helpers ───────────────────────────────────────────────────
 
-async function mountHook(userName = "Tester", selectedYear = 2026) {
+async function mountHook(userName = "Tester", selectedYear = 2026, user?: { name: string; role: "admin" | "editor" | "viewer"; loginAt: string; scope: { dzongkhagId: string; thromdeId: string | null; stakeholderId: string } }) {
   const mod = await import("./grme-store");
-  return renderHook(() => mod.useGRMEData(domains, userName, selectedYear));
+  return renderHook(() => mod.useGRMEData(domains, userName, selectedYear, user));
 }
 
 async function updateAndWait(hook: { current: { updateIndicator: (id: string, value: number | string | boolean, notes?: string) => Promise<void> } }, id: string, value: number | string | boolean, notes?: string) {
@@ -377,9 +380,18 @@ describe("useGRMEData (online mode)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     supabaseHasConfig = true;
-    mockApiFns.loadAssessments = vi.fn().mockResolvedValue({});
+    strictFreeTierMode = false;
+    mockApiFns.loadAssessments = vi.fn().mockResolvedValue({
+      thimphu: {
+        cityId: "thimphu",
+        cityName: "Thimphu",
+        assessments: {},
+        thromdeAssessments: {},
+      },
+    });
     mockApiFns.loadThromdes = vi.fn().mockResolvedValue([]);
     mockApiFns.loadAuditLogsForAssessment = vi.fn().mockResolvedValue({});
+    mockApiFns.loadDataEntryWindowConfig = vi.fn().mockResolvedValue(null);
     localStorage.clear();
   });
 
@@ -388,11 +400,14 @@ describe("useGRMEData (online mode)", () => {
     await waitFor(() => {
       expect(result.current.apiAvailable).toBe(true);
     });
+    expect(mockApiFns.loadAssessments).toHaveBeenCalledWith("thimphu");
+    expect(mockApiFns.loadAuditLogsForAssessment).toHaveBeenCalledWith("thimphu");
     await updateAndWait(result, "ss-1", 80, "Online test");
     expect(mockApiFns.saveAssessment).toHaveBeenCalledWith(
       "thimphu", 2026, "ss-1",
       expect.objectContaining({ value: 80, notes: "Online test" }),
-      undefined
+      undefined,
+      "Tester"
     );
     expect(mockApiFns.addAuditEntry).toHaveBeenCalledWith(
       "thimphu", 2026, "ss-1",
@@ -408,7 +423,7 @@ describe("useGRMEData (online mode)", () => {
     await act(async () => {
       await result.current.createYear(2027, 2026);
     });
-    expect(mockApiFns.saveAssessments).toHaveBeenCalledWith("thimphu", 2027, {}, undefined);
+    expect(mockApiFns.saveAssessments).toHaveBeenCalledWith("thimphu", 2027, {}, undefined, "Tester");
   });
 
   it("calls deleteYear when deleting a year", async () => {
@@ -437,10 +452,36 @@ describe("useGRMEData (online mode)", () => {
     expect(mockApiFns.saveAssessment).toHaveBeenCalledWith(
       "thimphu", 2026, "ss-1",
       expect.objectContaining({ value: 75 }),
-      undefined
+      undefined,
+      "Tester"
     );
     // Queue should be empty after drain
     expect(getQueue()).toHaveLength(0);
+  });
+
+  it("does not open realtime channels in strict free-tier mode", async () => {
+    strictFreeTierMode = true;
+    await mountHook();
+    expect(mockSupabaseClient.channel).not.toHaveBeenCalled();
+  });
+
+  it("blocks data writes when the entry window is closed for non-admins", async () => {
+    mockApiFns.loadDataEntryWindowConfig = vi.fn().mockResolvedValue({
+      enabled: false,
+      startAt: null,
+      endAt: null,
+    });
+    const { result } = await mountHook("Tester", 2026, {
+      name: "Tester",
+      role: "editor",
+      loginAt: new Date().toISOString(),
+      scope: { dzongkhagId: "thimphu", thromdeId: null, stakeholderId: "planning" },
+    });
+    await waitFor(() => {
+      expect(result.current.apiAvailable).toBe(true);
+    });
+    await updateAndWait(result, "ss-1", 80, "Closed window");
+    expect(mockApiFns.saveAssessment).not.toHaveBeenCalled();
   });
 });
 
@@ -473,6 +514,22 @@ describe("offline mutation queue", () => {
     expect(audit).toBeDefined();
     expect(audit.entry.action).toBe("create");
     expect(audit.entry.newValue).toBe("42");
+  });
+
+  it("keeps every offline audit entry during rapid repeated updates", async () => {
+    const { result } = await mountHook();
+    await updateAndWait(result, "ss-1", 10);
+    await updateAndWait(result, "ss-1", 20);
+    await updateAndWait(result, "ss-1", 30);
+
+    const queue = getQueue();
+    const saves = queue.filter((m: Record<string, unknown>) => m.type === "saveIndicator");
+    const audits = queue.filter((m: Record<string, unknown>) => m.type === "addAuditEntry");
+
+    expect(saves).toHaveLength(1);
+    expect(saves[0].data.value).toBe(30);
+    expect(audits).toHaveLength(3);
+    expect(audits.map((m: Record<string, any>) => m.entry.newValue)).toEqual(["10", "20", "30"]);
   });
 
   it("deduplicates saveIndicator for the same indicator", async () => {

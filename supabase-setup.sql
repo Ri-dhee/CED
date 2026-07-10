@@ -22,6 +22,7 @@ CREATE TABLE audit_log (
   year INTEGER NOT NULL,
   indicator_id TEXT NOT NULL,
   entry_id TEXT NOT NULL,
+  UNIQUE(city_id, year, indicator_id, entry_id),
   timestamp TIMESTAMPTZ DEFAULT NOW(),
   "user" TEXT,
   action TEXT,

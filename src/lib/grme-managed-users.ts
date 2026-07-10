@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { UserRole } from "./grme-user";
 import * as api from "./grme-api";
-import { supabase } from "./supabase";
+import { supabase, isStrictFreeTierMode } from "./supabase";
 
 export interface ManagedUser {
   id: string;
@@ -127,23 +127,43 @@ export function getActiveUsers(): ManagedUser[] {
 
 export function useManagedUsers() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const lastRefreshAtRef = useRef<number>(0);
+
+  const refreshUsers = useCallback(async (): Promise<boolean> => {
+    if (refreshPromiseRef.current) {
+      await refreshPromiseRef.current;
+      return lastRefreshAtRef.current > 0;
+    }
+
+    let loadedRemote = false;
+    const run = (async () => {
+      try {
+        const apiUsers = await api.loadUsers();
+        const sanitized = sanitizeUsers(apiUsers);
+        setUsers(sanitized);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+        lastRefreshAtRef.current = Date.now();
+        loadedRemote = true;
+      } catch {
+        // Keep current state
+      }
+    })();
+
+    refreshPromiseRef.current = run.finally(() => {
+      refreshPromiseRef.current = null;
+    });
+
+    await refreshPromiseRef.current;
+    return loadedRemote;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
-      try {
-        const apiUsers = await api.loadUsers();
-        if (!cancelled && apiUsers.length > 0) {
-          const sanitized = sanitizeUsers(apiUsers);
-          setUsers(sanitized);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized)); // sync to localStorage
-          return;
-        }
-      } catch {
-        // API unavailable
-      }
-      if (!cancelled) {
+      const loadedRemote = await refreshUsers();
+      if (!cancelled && !loadedRemote) {
         setUsers(loadUsers());
       }
     }
@@ -154,20 +174,15 @@ export function useManagedUsers() {
 
   // Real-time subscription — auto-refresh when users change
   useEffect(() => {
+    if (isStrictFreeTierMode) return;
     const channel = supabase()
       .channel("users-changes")
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "managed_users" },
           async () => {
-            try {
-              const apiUsers = await api.loadUsers();
-              const sanitized = sanitizeUsers(apiUsers);
-              setUsers(sanitized);
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-            } catch {
-              // Keep current state
-            }
+            if (Date.now() - lastRefreshAtRef.current < 30000) return;
+            await refreshUsers();
         }
       )
       .subscribe();
@@ -175,7 +190,7 @@ export function useManagedUsers() {
     return () => {
       supabase().removeChannel(channel);
     };
-  }, []);
+  }, [refreshUsers]);
 
   const addUser = useCallback(
     async (

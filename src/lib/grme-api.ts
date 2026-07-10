@@ -16,13 +16,152 @@ import {
 } from "./grme-data";
 import { FrameworkStorage } from "./grme-framework";
 import { ManagedUser } from "./grme-managed-users";
+import { DataEntryWindowConfig } from "./grme-user";
+
+const ADMIN_AUDIT_CITY_ID = "__admin__";
+const WRITE_RETRY_LIMIT = 3;
+const WRITE_RETRY_BASE_DELAY_MS = 75;
+
+function generateEntryId(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "Unknown error";
+}
+
+function isRetryableWriteError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  const code = error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code || "").toUpperCase()
+    : "";
+
+  return (
+    ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"].includes(code) ||
+    message.includes("failed to fetch") ||
+    message.includes("network error") ||
+    message.includes("fetch failed") ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("bad gateway") ||
+    message.includes("service unavailable") ||
+    message.includes("gateway timeout") ||
+    message.includes("too many requests")
+  );
+}
+
+async function withWriteRetry<T>(operation: string, run: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= WRITE_RETRY_LIMIT; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error;
+      if (attempt === WRITE_RETRY_LIMIT || !isRetryableWriteError(error)) {
+        throw error;
+      }
+      await sleep(WRITE_RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${operation} failed`);
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function loadConfigValue(key: string): Promise<string | null> {
+  const { data, error } = await supabase()
+    .from("config")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return (data?.value as string | null) ?? null;
+}
+
+async function saveConfigValue(key: string, value: string): Promise<void> {
+  await withWriteRetry("saveConfigValue", async () => {
+    const { error } = await supabase().from("config").upsert({ key, value }, { onConflict: "key" });
+    if (error) throw error;
+  });
+}
+
+export async function loadDataEntryWindowConfig(): Promise<DataEntryWindowConfig | null> {
+  const raw = await loadConfigValue("data_entry_window");
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<DataEntryWindowConfig>;
+    return {
+      enabled: parsed.enabled === true,
+      startAt: typeof parsed.startAt === "string" ? parsed.startAt : null,
+      endAt: typeof parsed.endAt === "string" ? parsed.endAt : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDataEntryWindowConfig(window: DataEntryWindowConfig): Promise<void> {
+  await saveConfigValue("data_entry_window", JSON.stringify(window));
+}
+
+export async function recordAdminEvent(params: {
+  actor: string;
+  action: "create" | "update" | "review";
+  entity: string;
+  notes: string;
+}): Promise<void> {
+  const actor = normalizeText(params.actor);
+  if (!actor) throw new Error("Admin event actor is required");
+
+  const row = {
+    city_id: ADMIN_AUDIT_CITY_ID,
+    year: new Date().getFullYear(),
+    indicator_id: `admin:${params.entity}`,
+    entry_id: generateEntryId(),
+    timestamp: new Date().toISOString(),
+    user: actor,
+    action: params.action,
+    field: params.entity,
+    old_value: "",
+    new_value: params.notes,
+    notes: params.notes,
+  };
+
+  await withWriteRetry("recordAdminEvent", async () => {
+    const { error } = await supabase().from("audit_log").upsert(row, {
+      onConflict: "city_id,year,indicator_id,entry_id",
+    });
+    if (error) throw error;
+  });
+}
 
 // ── Assessments ──────────────────────────────────────────────────
 
-export async function loadAssessments(): Promise<Record<string, CityData>> {
-  const { data, error } = await supabase()
-    .from("assessment_data")
-    .select("*");
+export async function loadAssessments(cityId?: string, year?: number): Promise<Record<string, CityData>> {
+  let query = supabase().from("assessment_data").select("*");
+  if (cityId) query = query.eq("city_id", cityId);
+  if (typeof year === "number") query = query.eq("year", year);
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -77,52 +216,82 @@ export async function loadAssessments(): Promise<Record<string, CityData>> {
   return result;
 }
 
+export async function loadAdminEvents(): Promise<AuditLog[]> {
+  const raw = await loadAllAuditLogEntries(ADMIN_AUDIT_CITY_ID);
+  const grouped: Record<string, AuditLog> = {};
+
+  for (const row of raw) {
+    const indicatorId = (row.indicator_id as string) || "";
+    if (!indicatorId) continue;
+    const entry = {
+      id: (row.entry_id as string) || "",
+      timestamp: (row.timestamp as string) || new Date().toISOString(),
+      user: (row.user as string) || "unknown",
+      action: (row.action as string) as "create" | "update" | "review",
+      field: (row.field as string) || "",
+      oldValue: ((row.old_value as string) || undefined) as string | undefined,
+      newValue: (row.new_value as string) || "",
+      notes: ((row.notes as string) || undefined) as string | undefined,
+    };
+
+    if (!grouped[indicatorId]) {
+      grouped[indicatorId] = { indicatorId, entries: [entry] };
+    } else {
+      grouped[indicatorId].entries.push(entry);
+    }
+  }
+
+  return Object.values(grouped).sort(
+    (a, b) => new Date(b.entries[0]?.timestamp || 0).getTime() - new Date(a.entries[0]?.timestamp || 0).getTime()
+  );
+}
+
 export async function saveAssessment(
   cityId: string,
   year: number,
   indicatorId: string,
   data: IndicatorData,
-  thromdeId?: string
+  thromdeId?: string,
+  actor?: string
 ): Promise<void> {
-  let scope = supabase()
-    .from("assessment_data")
-    .delete()
-    .eq("city_id", cityId)
-    .eq("year", year)
-    .eq("indicator_id", indicatorId);
-  scope = thromdeId ? scope.eq("thromde_id", thromdeId) : scope.is("thromde_id", null);
-  const { error: deleteError } = await scope;
-  if (deleteError) throw deleteError;
-
-  const { error } = await supabase().from("assessment_data").insert({
+  const lastUpdated = new Date().toISOString();
+  const updatedBy = normalizeText(data.updatedBy);
+  const payload = {
     city_id: cityId,
     year,
     indicator_id: indicatorId,
     value: data.value !== null && data.value !== undefined ? String(data.value) : "",
     evidence: data.evidence || "",
     notes: data.notes || "",
-    last_updated: new Date().toISOString(),
-    updated_by: data.updatedBy || "",
+    last_updated: lastUpdated,
+    updated_by: updatedBy,
     thromde_id: thromdeId || null,
+  };
+
+  await withWriteRetry("saveAssessment", async () => {
+    const { error } = await supabase().from("assessment_data").upsert(payload, { onConflict: "city_id,year,indicator_id" });
+    if (error) throw error;
   });
-  if (error) throw error;
+
+  const adminActor = normalizeText(actor);
+  if (adminActor) {
+    await recordAdminEvent({
+      actor: adminActor,
+      action: "update",
+      entity: "assessment",
+      notes: JSON.stringify({ cityId, year, indicatorId, thromdeId, value: data.value ?? null }),
+    });
+  }
 }
 
 export async function saveAssessments(
   cityId: string,
   year: number,
   indicators: Record<string, IndicatorData>,
-  thromdeId?: string
+  thromdeId?: string,
+  actor?: string
 ): Promise<void> {
-  let deleteQuery = supabase()
-    .from("assessment_data")
-    .delete()
-    .eq("city_id", cityId)
-    .eq("year", year);
-  deleteQuery = thromdeId ? deleteQuery.eq("thromde_id", thromdeId) : deleteQuery.is("thromde_id", null);
-  const { error: deleteError } = await deleteQuery;
-  if (deleteError) throw deleteError;
-
+  const lastUpdated = new Date().toISOString();
   const rows = Object.entries(indicators).map(([indicatorId, data]) => ({
     city_id: cityId,
     year,
@@ -130,15 +299,27 @@ export async function saveAssessments(
     value: data.value !== null && data.value !== undefined ? String(data.value) : "",
     evidence: data.evidence || "",
     notes: data.notes || "",
-    last_updated: new Date().toISOString(),
-    updated_by: data.updatedBy || "",
+    last_updated: lastUpdated,
+    updated_by: normalizeText(data.updatedBy),
     thromde_id: thromdeId || null,
   }));
 
   if (rows.length === 0) return;
 
-  const { error } = await supabase().from("assessment_data").insert(rows);
-  if (error) throw error;
+  await withWriteRetry("saveAssessments", async () => {
+    const { error } = await supabase().from("assessment_data").upsert(rows, { onConflict: "city_id,year,indicator_id" });
+    if (error) throw error;
+  });
+
+  const adminActor = normalizeText(actor);
+  if (adminActor) {
+    await recordAdminEvent({
+      actor: adminActor,
+      action: "update",
+      entity: "assessment-bulk",
+      notes: JSON.stringify({ cityId, year, count: rows.length, thromdeId }),
+    });
+  }
 }
 
 export async function deleteYear(
@@ -146,24 +327,26 @@ export async function deleteYear(
   year: number,
   thromdeId?: string
 ): Promise<void> {
-  let query = supabase()
-    .from("assessment_data")
-    .delete()
-    .eq("city_id", cityId)
-    .eq("year", year);
-  query = thromdeId ? query.eq("thromde_id", thromdeId) : query.is("thromde_id", null);
-  const { error } = await query;
-  if (error) throw error;
+  await withWriteRetry("deleteYear", async () => {
+    let query = supabase()
+      .from("assessment_data")
+      .delete()
+      .eq("city_id", cityId)
+      .eq("year", year);
+    query = thromdeId ? query.eq("thromde_id", thromdeId) : query.is("thromde_id", null);
+    const { error } = await query;
+    if (error) throw error;
+  });
 }
 
 // ── Audit Log ────────────────────────────────────────────────────
 
 /** Load audit entries grouped by city → year → indicatorId.
  *  Returns a structure ready to merge into CityData. */
-export async function loadAuditLogsForAssessment(): Promise<
+export async function loadAuditLogsForAssessment(cityId?: string, year?: number): Promise<
   Record<string, Record<number, AuditLog[]>>
 > {
-  const raw = await loadAllAuditLogEntries();
+  const raw = await loadAllAuditLogEntries(cityId, year);
   const result: Record<string, Record<number, AuditLog[]>> = {};
 
   for (const row of raw) {
@@ -203,29 +386,31 @@ export async function loadAuditLogsForAssessment(): Promise<
 
 export async function loadAuditLog(
   page: number = 0,
-  pageSize: number = 500
+  pageSize: number = 500,
+  cityId?: string,
+  year?: number
 ): Promise<{ entries: Record<string, unknown>[]; total: number | null }> {
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
-  const { data, error, count } = await supabase()
-    .from("audit_log")
-    .select("*", { count: "estimated" })
-    .order("timestamp", { ascending: false })
-    .range(from, to);
+  let query = supabase().from("audit_log").select("*", { count: "estimated" }).order("timestamp", { ascending: false });
+  if (cityId) query = query.eq("city_id", cityId);
+  if (typeof year === "number") query = query.eq("year", year);
+
+  const { data, error, count } = await query.range(from, to);
 
   if (error) throw error;
   return { entries: data || [], total: count };
 }
 
-export async function loadAllAuditLogEntries(): Promise<Record<string, unknown>[]> {
+export async function loadAllAuditLogEntries(cityId?: string, year?: number): Promise<Record<string, unknown>[]> {
   const PAGE_SIZE = 1000;
   let all: Record<string, unknown>[] = [];
   let page = 0;
   let fetched: Record<string, unknown>[];
 
   do {
-    const { entries } = await loadAuditLog(page, PAGE_SIZE);
+    const { entries } = await loadAuditLog(page, PAGE_SIZE, cityId, year);
     fetched = entries;
     all = all.concat(fetched);
     page++;
@@ -240,7 +425,7 @@ export async function addAuditEntry(
   indicatorId: string,
   entry: AuditEntry
 ): Promise<void> {
-  const { error } = await supabase().from("audit_log").insert({
+  const payload = {
     city_id: cityId,
     year,
     indicator_id: indicatorId,
@@ -252,8 +437,14 @@ export async function addAuditEntry(
     old_value: entry.oldValue || "",
     new_value: entry.newValue,
     notes: entry.notes || "",
+  };
+
+  await withWriteRetry("addAuditEntry", async () => {
+    const { error } = await supabase().from("audit_log").upsert(payload, {
+      onConflict: "city_id,year,indicator_id,entry_id",
+    });
+    if (error) throw error;
   });
-  if (error) throw error;
 }
 
 // ── Framework ────────────────────────────────────────────────────
@@ -272,16 +463,27 @@ export async function loadFramework(): Promise<FrameworkStorage | null> {
   return data?.value || null;
 }
 
-export async function saveFramework(framework: FrameworkStorage): Promise<void> {
-  const { error } = await supabase().from("framework").upsert(
-    {
-      key: "framework",
-      value: framework,
-      last_updated: new Date().toISOString(),
-    },
-    { onConflict: "key" }
-  );
-  if (error) throw error;
+export async function saveFramework(framework: FrameworkStorage, actor?: string): Promise<void> {
+  const payload = {
+    key: "framework",
+    value: framework,
+    last_updated: new Date().toISOString(),
+  };
+
+  await withWriteRetry("saveFramework", async () => {
+    const { error } = await supabase().from("framework").upsert(payload, { onConflict: "key" });
+    if (error) throw error;
+  });
+
+  const adminActor = normalizeText(actor);
+  if (adminActor) {
+    await recordAdminEvent({
+      actor: adminActor,
+      action: "update",
+      entity: "framework",
+      notes: JSON.stringify({ domains: framework.domains.length, proposals: framework.proposals.length }),
+    });
+  }
 }
 
 // ── Managed Users ────────────────────────────────────────────────
@@ -301,32 +503,43 @@ export async function loadUsers(): Promise<ManagedUser[]> {
   }));
 }
 
-export async function saveUsers(users: ManagedUser[]): Promise<void> {
-  // Delete all then insert (simple approach for small user lists)
-  const { error: delError } = await supabase()
-    .from("managed_users")
-    .delete()
-    .neq("id", "__delete_all__");
+export async function saveUsers(users: ManagedUser[], actor?: string): Promise<void> {
+  const rows = users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    role: u.role,
+    password_hash: u.passwordHash,
+    created_at: u.createdAt,
+    last_login_at: u.lastLoginAt,
+    active: u.active,
+    stakeholder_id: u.stakeholderId || "",
+    dzongkhag_id: u.dzongkhagId || "",
+    thromde_id: u.thromdeId || null,
+  }));
 
-  if (delError) throw delError;
+  await withWriteRetry("saveUsers", async () => {
+    const { error: delError } = await supabase()
+      .from("managed_users")
+      .delete()
+      .neq("id", "__delete_all__");
 
-  if (users.length === 0) return;
+    if (delError) throw delError;
 
-  const { error } = await supabase().from("managed_users").insert(
-    users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      role: u.role,
-      password_hash: u.passwordHash,
-      created_at: u.createdAt,
-      last_login_at: u.lastLoginAt,
-      active: u.active,
-      stakeholder_id: u.stakeholderId || "",
-      dzongkhag_id: u.dzongkhagId || "",
-      thromde_id: u.thromdeId || null,
-    }))
-  );
-  if (error) throw error;
+    if (rows.length === 0) return;
+
+    const { error } = await supabase().from("managed_users").insert(rows);
+    if (error) throw error;
+  });
+
+  const adminActor = normalizeText(actor);
+  if (adminActor) {
+    await recordAdminEvent({
+      actor: adminActor,
+      action: "update",
+      entity: "managed-users",
+      notes: JSON.stringify({ count: users.length }),
+    });
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -359,22 +572,26 @@ export async function loadThromdes(): Promise<Thromde[]> {
 }
 
 export async function saveThromde(thromde: Thromde): Promise<void> {
-  const { error } = await supabase()
-    .from("thromdes")
-    .upsert({
-      id: thromde.id,
-      dzongkhag_id: thromde.dzongkhagId,
-      name: thromde.name,
-    }, { onConflict: "id" });
-  if (error) throw error;
+  await withWriteRetry("saveThromde", async () => {
+    const { error } = await supabase()
+      .from("thromdes")
+      .upsert({
+        id: thromde.id,
+        dzongkhag_id: thromde.dzongkhagId,
+        name: thromde.name,
+      }, { onConflict: "id" });
+    if (error) throw error;
+  });
 }
 
 export async function deleteThromde(id: string): Promise<void> {
-  const { error } = await supabase()
-    .from("thromdes")
-    .delete()
-    .eq("id", id);
-  if (error) throw error;
+  await withWriteRetry("deleteThromde", async () => {
+    const { error } = await supabase()
+      .from("thromdes")
+      .delete()
+      .eq("id", id);
+    if (error) throw error;
+  });
 }
 
 // ── Queue status ────────────────────────────────────────────────

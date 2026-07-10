@@ -1,4 +1,4 @@
-import { Benchmark, DataType, Direction, Domain, Indicator, IndicatorType, SubDomain } from "./grme-data";
+import { Benchmark, DataType, Direction, Domain, Indicator, IndicatorType, StakeholderId, SubDomain } from "./grme-data";
 
 function slugify(value: string): string {
   return value
@@ -89,7 +89,31 @@ function domain(
   return { id, name, shortName, description, icon, color, subdomains, methodologyNote, weight: 1 };
 }
 
-export const DEFAULT_DOMAINS: Domain[] = [
+export const DEFAULT_STAKEHOLDER_ACCESS_BY_DOMAIN: Record<string, StakeholderId[]> = {
+  "safety-security": ["governance", "social"],
+  "mobility-access": ["transport", "planning"],
+  "housing-land": ["planning", "finance", "governance"],
+  "economic-inclusion": ["finance", "social", "planning"],
+  "health-wash": ["social", "planning", "water"],
+  "governance-participation": ["governance", "planning"],
+  "environment-climate-resilience": ["environment", "water", "planning"],
+  "culture-identity": ["social", "governance", "planning"],
+};
+
+function withDefaultStakeholderAccess(domains: Domain[]): Domain[] {
+  return domains.map((domain) => ({
+    ...domain,
+    subdomains: domain.subdomains.map((subdomain) => ({
+      ...subdomain,
+      indicators: subdomain.indicators.map((indicator) => ({
+        ...indicator,
+        stakeholderAccess: [...(DEFAULT_STAKEHOLDER_ACCESS_BY_DOMAIN[domain.id] || [])],
+      })),
+    })),
+  }));
+}
+
+export const DEFAULT_DOMAINS: Domain[] = withDefaultStakeholderAccess([
   domain(
     "safety-security",
     "Safety and Security",
@@ -475,4 +499,4 @@ export const DEFAULT_DOMAINS: Domain[] = [
     ],
     "Cultural scoring tracks wellbeing, heritage, and attitudes that shape inclusion."
   ),
-];
+]);

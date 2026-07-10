@@ -136,7 +136,10 @@ supabase
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxxx
+NEXT_PUBLIC_GRME_STRICT_FREE_TIER=true
 ```
+
+- Set `NEXT_PUBLIC_GRME_STRICT_FREE_TIER=true` to disable realtime listeners and focus-triggered refreshes in low-quota deployments.
 
 ## Files to Create/Modify
 1. `src/lib/supabase.ts` — Supabase client

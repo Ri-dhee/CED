@@ -11,6 +11,12 @@ export interface UserScope {
   stakeholderId: string;
 }
 
+export interface DataEntryWindowConfig {
+  enabled: boolean;
+  startAt: string | null;
+  endAt: string | null;
+}
+
 export interface GrmeUser {
   name: string;
   role: UserRole;
@@ -68,6 +74,22 @@ export function canEnterData(role: UserRole): boolean {
   return role === "admin" || role === "editor";
 }
 
+export function canEnterDataDuringWindow(
+  user: GrmeUser,
+  window: DataEntryWindowConfig | null,
+  now: Date = new Date()
+): boolean {
+  if (user.role === "admin") return true;
+  if (!canEnterData(user.role)) return false;
+  if (!window?.enabled) return false;
+
+  const current = now.getTime();
+  const start = window.startAt ? new Date(window.startAt).getTime() : Number.NEGATIVE_INFINITY;
+  const end = window.endAt ? new Date(window.endAt).getTime() : Number.POSITIVE_INFINITY;
+  if (Number.isNaN(start) || Number.isNaN(end)) return false;
+  return current >= start && current <= end;
+}
+
 /** Returns the list of dzongkhags a user is allowed to see. */
 export function getAccessibleDzongkhags(user: GrmeUser): typeof CITIES {
   if (user.role === "admin") return CITIES;
@@ -87,7 +109,7 @@ export function canAccessDzongkhag(user: GrmeUser, dzongkhagId: string): boolean
 /** True if the user can edit a specific indicator (checks stakeholder access). */
 export function canAccessIndicator(user: GrmeUser, indicator: Indicator): boolean {
   if (user.role === "admin") return true;
-  if (!indicator.stakeholderAccess || indicator.stakeholderAccess.length === 0) return true;
+  if (!indicator.stakeholderAccess || indicator.stakeholderAccess.length === 0) return false;
   return indicator.stakeholderAccess.includes(user.scope.stakeholderId);
 }
 

@@ -5,6 +5,7 @@ import {
   Domain,
   SubDomain,
   Indicator,
+  STAKEHOLDERS,
 } from "./grme-data";
 import {
   FrameworkProposal,
@@ -19,9 +20,30 @@ import {
   newSubDomain,
   newIndicator,
 } from "./grme-framework";
-import { supabase, hasSupabaseConfig } from "./supabase";
+import { DEFAULT_STAKEHOLDER_ACCESS_BY_DOMAIN } from "./grme-framework-defaults";
+import { supabase, hasSupabaseConfig, isStrictFreeTierMode } from "./supabase";
 
 const CURRENT_USER = "Stakeholder";
+const MAX_STAKEHOLDER_ACCESS = 5;
+
+function normalizeStakeholderAccess(value: string): string[] {
+  const requested = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const match = STAKEHOLDERS.find(
+        (stakeholder) =>
+          stakeholder.id.toLowerCase() === part.toLowerCase() ||
+          stakeholder.name.toLowerCase() === part.toLowerCase()
+      );
+      return (match?.id || part).toLowerCase();
+    });
+
+  if (requested.length === 0) return [];
+
+  return Array.from(new Set(requested)).filter(Boolean).slice(0, MAX_STAKEHOLDER_ACCESS);
+}
 
 export function useGRMEFramework() {
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -29,12 +51,21 @@ export function useGRMEFramework() {
   const [loaded, setLoaded] = useState(false);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const lastRefreshAtRef = useRef<number>(0);
 
   const refreshFramework = useCallback(async () => {
+    if (refreshPromiseRef.current) {
+      await refreshPromiseRef.current;
+      return;
+    }
+
+    const run = (async () => {
     if (!hasSupabaseConfig) {
       const fw = loadFramework();
       setDomains(fw.domains);
       setProposals(fw.proposals);
+      lastRefreshAtRef.current = Date.now();
       return;
     }
     try {
@@ -45,13 +76,22 @@ export function useGRMEFramework() {
         setDomains(chosen.domains);
         setProposals(chosen.proposals);
         cacheFramework(chosen);
+        lastRefreshAtRef.current = Date.now();
       }
     } catch {
       // Keep current state
     }
+    })();
+
+    refreshPromiseRef.current = run.finally(() => {
+      refreshPromiseRef.current = null;
+    });
+
+    return refreshPromiseRef.current;
   }, []);
 
   const debouncedRefreshFramework = useCallback(() => {
+    if (Date.now() - lastRefreshAtRef.current < 30000) return;
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => {
       refreshFramework();
@@ -73,6 +113,7 @@ export function useGRMEFramework() {
           const fw = loadFramework();
           setDomains(fw.domains);
           setProposals(fw.proposals);
+          lastRefreshAtRef.current = Date.now();
           setLoaded(true);
         }
         return;
@@ -84,6 +125,7 @@ export function useGRMEFramework() {
         setDomains(chosen.domains);
         setProposals(chosen.proposals);
         cacheFramework(chosen);
+        lastRefreshAtRef.current = Date.now();
       }
       if (!cancelled) setLoaded(true);
     }
@@ -94,7 +136,7 @@ export function useGRMEFramework() {
 
   // Real-time subscription — auto-refresh when framework changes
   useEffect(() => {
-    if (!hasSupabaseConfig) return;
+    if (!hasSupabaseConfig || isStrictFreeTierMode) return;
     const channel = supabase()
       .channel("framework-changes")
       .on(
@@ -113,6 +155,7 @@ export function useGRMEFramework() {
 
   // Refresh on window focus
   useEffect(() => {
+    if (isStrictFreeTierMode) return;
     const handleFocus = () => debouncedRefreshFramework();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
@@ -386,6 +429,11 @@ export function useGRMEFramework() {
                   return { ...ind, description: value };
                 if (field === "source")
                   return { ...ind, source: value || undefined };
+                if (field === "stakeholderAccess")
+                  return {
+                    ...ind,
+                    stakeholderAccess: normalizeStakeholderAccess(value),
+                  };
                 if (field === "validationStatus")
                   return { ...ind, validationStatus: value as Indicator["validationStatus"] };
                 if (field.startsWith("benchmark.")) {
@@ -451,6 +499,7 @@ export function useGRMEFramework() {
     (domainId: string, subId: string) => {
       const ind = newIndicator();
       ind.name = "New Indicator";
+      ind.stakeholderAccess = [...(DEFAULT_STAKEHOLDER_ACCESS_BY_DOMAIN[domainId] || [])].slice(0, MAX_STAKEHOLDER_ACCESS);
       const newDomains = domains.map((d) => {
         if (d.id !== domainId) return d;
         return {

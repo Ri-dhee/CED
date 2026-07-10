@@ -9,6 +9,9 @@ export const hasSupabaseConfig =
   !supabaseUrl.includes("placeholder.supabase.co") &&
   supabaseAnonKey !== "placeholder";
 
+export const isStrictFreeTierMode =
+  process.env.NEXT_PUBLIC_GRME_STRICT_FREE_TIER === "true";
+
 function createNoopSupabase(): SupabaseClient {
   const noopResult = { data: null, error: null };
 

@@ -5,8 +5,12 @@ import {
   Domain,
   IndicatorType,
   DataType,
-  Direction,
+  STAKEHOLDERS,
 } from "@/lib/grme-data";
+
+const STAKEHOLDER_NAME_BY_ID = new Map(
+  STAKEHOLDERS.map((stakeholder) => [stakeholder.id, stakeholder.name])
+);
 
 interface SpreadsheetEditorProps {
   domains: Domain[];
@@ -205,6 +209,12 @@ export default function SpreadsheetEditor({
   );
   const [collapsedSubs, setCollapsedSubs] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [editingAccess, setEditingAccess] = useState<{
+    domainId: string;
+    subId: string;
+    indId: string;
+  } | null>(null);
+  const [accessDraft, setAccessDraft] = useState<string[]>([]);
 
   const toggleDomain = (id: string) => {
     setCollapsedDomains((prev) => {
@@ -251,13 +261,48 @@ export default function SpreadsheetEditor({
     "text",
     "boolean",
   ];
-  const DIRECTIONS: Direction[] = ["higher", "lower"];
-
+  const DIRECTIONS: string[] = ["higher", "lower"];
   const totalIndicators = domains.reduce(
     (sum, d) =>
       sum + d.subdomains.reduce((s, sub) => s + sub.indicators.length, 0),
     0
   );
+
+  const formatStakeholders = (ids?: string[]) =>
+    ids && ids.length > 0
+      ? ids.map((id) => STAKEHOLDER_NAME_BY_ID.get(id) || id).join(", ")
+      : "";
+
+  const beginEditAccess = (domainId: string, subId: string, indId: string, currentIds?: string[]) => {
+    setEditingAccess({ domainId, subId, indId });
+    setAccessDraft([...(currentIds || [])]);
+  };
+
+  const toggleAccess = (id: string) => {
+    setAccessDraft((prev) => {
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
+      if (prev.length >= 5) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const saveAccess = () => {
+    if (!editingAccess) return;
+    onUpdateIndicator(
+      editingAccess.domainId,
+      editingAccess.subId,
+      editingAccess.indId,
+      "stakeholderAccess",
+      accessDraft.join(",")
+    );
+    setEditingAccess(null);
+    setAccessDraft([]);
+  };
+
+  const cancelAccess = () => {
+    setEditingAccess(null);
+    setAccessDraft([]);
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -535,230 +580,285 @@ export default function SpreadsheetEditor({
 
                           {/* Indicator Rows */}
                           {!isSubCollapsed &&
-                            sub.indicators.map((ind) => (
-                              <tr
-                                key={`ind-${ind.id}`}
-                                className="border-b border-gray-50 hover:bg-gray-50/50"
-                              >
-                                <td className="px-3 py-1 pl-16">
-                                  <EditableCell
-                                    value={ind.name}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "name",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.id}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "id",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.type}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "type",
-                                        v
-                                      )
-                                    }
-                                    type="select"
-                                    options={INDICATOR_TYPES}
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.dataType}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "dataType",
-                                        v
-                                      )
-                                    }
-                                    type="select"
-                                    options={DATA_TYPES}
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.unit}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "unit",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.direction}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "direction",
-                                        v
-                                      )
-                                    }
-                                    type="select"
-                                    options={DIRECTIONS}
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.benchmark.critical}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "benchmark.critical",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.benchmark.developing}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "benchmark.developing",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.benchmark.progressive}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "benchmark.progressive",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.benchmark.exemplary}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "benchmark.exemplary",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.description}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "description",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.source || ""}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "source",
-                                        v
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <EditableCell
-                                    value={ind.direction}
-                                    onSave={(v) =>
-                                      onUpdateIndicator(
-                                        domain.id,
-                                        sub.id,
-                                        ind.id,
-                                        "direction",
-                                        v
-                                      )
-                                    }
-                                    type="select"
-                                    options={DIRECTIONS}
-                                  />
-                                </td>
-                                <td className="px-3 py-1">
-                                  <button
-                                    onClick={() => {
-                                      if (confirmDelete === `i-${ind.id}`) {
-                                        onDeleteIndicator(
+                            sub.indicators.map((ind) => {
+                              const stakeholderLabel = formatStakeholders(ind.stakeholderAccess);
+
+                              return (<> 
+                                <tr
+                                  key={`ind-${ind.id}`}
+                                  className="border-b border-gray-50 hover:bg-gray-50/50"
+                                >
+                                  <td className="px-3 py-1 pl-16">
+                                    <EditableCell
+                                      value={ind.name}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
                                           domain.id,
                                           sub.id,
-                                          ind.id
-                                        );
-                                        setConfirmDelete(null);
-                                      } else {
-                                        setConfirmDelete(`i-${ind.id}`);
-                                        setTimeout(
-                                          () => setConfirmDelete(null),
-                                          3000
-                                        );
+                                          ind.id,
+                                          "name",
+                                          v
+                                        )
                                       }
-                                    }}
-                                    className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                      confirmDelete === `i-${ind.id}`
-                                        ? "bg-red-500 text-white"
-                                        : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-                                    }`}
-                                  >
-                                    ✕
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.id}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "id",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.type}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "type",
+                                          v
+                                        )
+                                      }
+                                      type="select"
+                                      options={INDICATOR_TYPES}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.dataType}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "dataType",
+                                          v
+                                        )
+                                      }
+                                      type="select"
+                                      options={DATA_TYPES}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.unit}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "unit",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.direction}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "direction",
+                                          v
+                                        )
+                                      }
+                                      type="select"
+                                      options={DIRECTIONS}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.benchmark.critical}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "benchmark.critical",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.benchmark.developing}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "benchmark.developing",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.benchmark.progressive}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "benchmark.progressive",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.benchmark.exemplary}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "benchmark.exemplary",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.description}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "description",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <EditableCell
+                                      value={ind.source || ""}
+                                      onSave={(v) =>
+                                        onUpdateIndicator(
+                                          domain.id,
+                                          sub.id,
+                                          ind.id,
+                                          "source",
+                                          v
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="text-[10px] text-gray-400 truncate max-w-[110px]"
+                                        title={stakeholderLabel}
+                                      >
+                                        {stakeholderLabel || "All editors"}
+                                      </span>
+                                      <button
+                                        onClick={() =>
+                                          beginEditAccess(
+                                            domain.id,
+                                            sub.id,
+                                            ind.id,
+                                            ind.stakeholderAccess
+                                          )
+                                        }
+                                        className="text-[10px] text-primary hover:text-primary-dark"
+                                        title="Edit stakeholder access"
+                                      >
+                                        Access
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-1">
+                                    <button
+                                      onClick={() => {
+                                        if (confirmDelete === `i-${ind.id}`) {
+                                          onDeleteIndicator(
+                                            domain.id,
+                                            sub.id,
+                                            ind.id
+                                          );
+                                          setConfirmDelete(null);
+                                        } else {
+                                          setConfirmDelete(`i-${ind.id}`);
+                                          setTimeout(
+                                            () => setConfirmDelete(null),
+                                            3000
+                                          );
+                                        }
+                                      }}
+                                      className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                        confirmDelete === `i-${ind.id}`
+                                          ? "bg-red-500 text-white"
+                                          : "text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                      }`}
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                                  {editingAccess?.indId === ind.id && (
+                                    <tr className="bg-emerald-50/50 border-b border-emerald-100">
+                                      <td colSpan={14} className="px-3 py-3 pl-16">
+                                        <div className="flex flex-wrap items-center gap-3">
+                                          {STAKEHOLDERS.map((stakeholder) => {
+                                            const checked = accessDraft.includes(stakeholder.id);
+                                            const disabled = !checked && accessDraft.length >= 5;
+                                            return (
+                                              <label
+                                                key={stakeholder.id}
+                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] ${checked ? "border-emerald-500 bg-white text-emerald-700" : "border-gray-200 bg-white text-gray-500"} ${disabled ? "opacity-50" : ""}`}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={checked}
+                                                  disabled={disabled}
+                                                  onChange={() => toggleAccess(stakeholder.id)}
+                                                  className="h-3 w-3"
+                                                />
+                                                {stakeholder.name}
+                                              </label>
+                                            );
+                                          })}
+                                          <span className="text-[10px] text-gray-400">
+                                            {accessDraft.length}/5 selected
+                                          </span>
+                                          <button
+                                            onClick={saveAccess}
+                                            className="text-[10px] font-medium text-primary hover:text-primary-dark"
+                                          >
+                                            Save
+                                          </button>
+                                          <button
+                                            onClick={cancelAccess}
+                                            className="text-[10px] text-gray-400 hover:text-gray-600"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </>
+                              );
+                            })}
 
                           {/* Add Indicator Row */}
                           {!isSubCollapsed && (

@@ -9,7 +9,7 @@ import {
   deepClone,
 } from "./grme-data";
 import * as api from "./grme-api";
-import { DEFAULT_DOMAINS } from "./grme-framework-defaults";
+import { DEFAULT_DOMAINS, DEFAULT_STAKEHOLDER_ACCESS_BY_DOMAIN } from "./grme-framework-defaults";
 
 // ── Proposal Types ──────────────────────────────────────────────
 
@@ -66,6 +66,10 @@ function isBenchmark(value: unknown): value is Benchmark {
   );
 }
 
+function isStakeholderAccess(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= 5 && value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
+}
+
 function isIndicator(value: unknown): value is Indicator {
   return (
     isObject(value) &&
@@ -76,7 +80,8 @@ function isIndicator(value: unknown): value is Indicator {
     typeof value.unit === "string" &&
     typeof value.description === "string" &&
     isBenchmark(value.benchmark) &&
-    VALID_DIRECTIONS.has(String(value.direction))
+    VALID_DIRECTIONS.has(String(value.direction)) &&
+    (value.stakeholderAccess === undefined || isStakeholderAccess(value.stakeholderAccess))
   );
 }
 
@@ -131,6 +136,34 @@ function sanitizeFrameworkStorage(value: unknown): FrameworkStorage | null {
   };
 }
 
+function hydrateStakeholderAccess(domains: Domain[]): Domain[] {
+  return domains.map((domain) => ({
+    ...domain,
+    subdomains: domain.subdomains.map((subdomain) => ({
+      ...subdomain,
+      indicators: subdomain.indicators.map((indicator) =>
+        indicator.stakeholderAccess === undefined
+          ? {
+              ...indicator,
+              stakeholderAccess: [...(DEFAULT_STAKEHOLDER_ACCESS_BY_DOMAIN[domain.id] || [])],
+            }
+          : indicator
+      ),
+    })),
+  }));
+}
+
+function needsStakeholderAccessHydration(domains: Domain[]): boolean {
+  for (const domain of domains) {
+    for (const subdomain of domain.subdomains) {
+      for (const indicator of subdomain.indicators) {
+        if (indicator.stakeholderAccess === undefined) return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function generateEntityId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`;
 }
@@ -145,7 +178,14 @@ export function loadFramework(): FrameworkStorage {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = sanitizeFrameworkStorage(JSON.parse(raw));
-      if (parsed) return parsed;
+      if (parsed) {
+        return {
+          ...parsed,
+          domains: needsStakeholderAccessHydration(parsed.domains)
+            ? hydrateStakeholderAccess(parsed.domains)
+            : parsed.domains,
+        };
+      }
     }
   } catch {
     // fall through

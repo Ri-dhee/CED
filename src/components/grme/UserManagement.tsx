@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useManagedUsers,
 } from "@/lib/grme-managed-users";
@@ -10,14 +10,29 @@ import {
   ROLE_COLORS,
 } from "@/lib/grme-user";
 import { CITIES, THROMDES, STAKEHOLDERS } from "@/lib/grme-data";
+import { DataEntryWindowConfig } from "@/lib/grme-user";
+import { saveDataEntryWindowConfig, recordAdminEvent } from "@/lib/grme-api";
+import type { AuditLog } from "@/lib/grme-data";
 
 interface UserManagementProps {
   onClose: () => void;
+  dataEntryWindow: DataEntryWindowConfig | null;
+  adminEvents: AuditLog[];
+  adminName: string;
+  onRefreshData: () => void | Promise<void>;
 }
 
 const ROLES: UserRole[] = ["admin", "editor", "viewer"];
 
-export default function UserManagement({ onClose }: UserManagementProps) {
+function toLocalInputValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+export default function UserManagement({ onClose, dataEntryWindow, adminEvents, adminName, onRefreshData }: UserManagementProps) {
   const {
     users,
     addUser,
@@ -45,6 +60,18 @@ export default function UserManagement({ onClose }: UserManagementProps) {
   const [showPasswordField, setShowPasswordField] = useState<string | null>(null);
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  const [windowEnabled, setWindowEnabled] = useState(false);
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
+  const [windowSaving, setWindowSaving] = useState(false);
+  const [windowError, setWindowError] = useState("");
+  const windowHistory = adminEvents.filter((log) => log.indicatorId === "admin:data-entry-window");
+
+  useEffect(() => {
+    setWindowEnabled(Boolean(dataEntryWindow?.enabled));
+    setWindowStart(toLocalInputValue(dataEntryWindow?.startAt));
+    setWindowEnd(toLocalInputValue(dataEntryWindow?.endAt));
+  }, [dataEntryWindow]);
 
   const handleAdd = async () => {
     if (!newName.trim()) {
@@ -97,6 +124,42 @@ export default function UserManagement({ onClose }: UserManagementProps) {
     setNewPass("");
     setConfirmPass("");
     setError("");
+  };
+
+  const handleSaveWindow = async () => {
+    setWindowError("");
+    if (windowEnabled && (!windowStart || !windowEnd)) {
+      setWindowError("Please set both start and end times.");
+      return;
+    }
+    if (windowEnabled && new Date(windowStart) >= new Date(windowEnd)) {
+      setWindowError("Start time must be before end time.");
+      return;
+    }
+
+    setWindowSaving(true);
+    try {
+      await saveDataEntryWindowConfig({
+        enabled: windowEnabled,
+        startAt: windowEnabled ? new Date(windowStart).toISOString() : null,
+        endAt: windowEnabled ? new Date(windowEnd).toISOString() : null,
+      });
+      await recordAdminEvent({
+        actor: adminName,
+        action: "update",
+        entity: "data-entry-window",
+        notes: JSON.stringify({
+          enabled: windowEnabled,
+          startAt: windowEnabled ? new Date(windowStart).toISOString() : null,
+          endAt: windowEnabled ? new Date(windowEnd).toISOString() : null,
+        }),
+      });
+      await Promise.resolve(onRefreshData());
+    } catch {
+      setWindowError("Unable to save data entry window.");
+    } finally {
+      setWindowSaving(false);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -247,6 +310,95 @@ export default function UserManagement({ onClose }: UserManagementProps) {
               </div>
             </div>
           )}
+
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Data Entry Window</h3>
+                <p className="text-xs text-gray-500">
+                  {dataEntryWindow?.enabled
+                    ? "Currently controlled by an admin-defined time window."
+                    : "Currently closed unless an admin opens it."}
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={windowEnabled}
+                  onChange={(e) => setWindowEnabled(e.target.checked)}
+                />
+                Enabled
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Start</label>
+                <input
+                  type="datetime-local"
+                  value={windowStart}
+                  onChange={(e) => setWindowStart(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">End</label>
+                <input
+                  type="datetime-local"
+                  value={windowEnd}
+                  onChange={(e) => setWindowEnd(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+            {windowError && <p className="text-xs text-red-500">{windowError}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveWindow}
+                disabled={windowSaving}
+                className="px-4 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+              >
+                {windowSaving ? "Saving..." : "Save Window"}
+              </button>
+              <button
+                onClick={() => {
+                  setWindowEnabled(false);
+                  setWindowStart("");
+                  setWindowEnd("");
+                  setWindowError("");
+                }}
+                className="px-4 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white rounded-xl border border-gray-200 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Window History</h3>
+                <p className="text-xs text-gray-500">Recent data entry window changes.</p>
+              </div>
+              <span className="text-xs text-gray-400">{windowHistory.length} events</span>
+            </div>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {windowHistory.length === 0 ? (
+                <p className="text-xs text-gray-400">No window changes yet.</p>
+              ) : (
+                windowHistory.slice(0).reverse().map((log) =>
+                  log.entries.slice(0).reverse().map((entry) => (
+                    <div key={entry.id} className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-gray-800">{entry.user}</span>
+                        <span className="text-gray-400">{new Date(entry.timestamp).toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1 text-gray-500">{entry.newValue || entry.notes || "Updated window"}</div>
+                    </div>
+                  ))
+                )
+              )}
+            </div>
+          </div>
 
           {/* Active Users */}
           <div>

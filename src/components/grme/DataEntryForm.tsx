@@ -11,6 +11,10 @@ import {
   isLowerBetter,
 } from "@/lib/grme-data";
 
+const STAKEHOLDER_NAME_BY_ID = new Map(
+  STAKEHOLDERS.map((stakeholder) => [stakeholder.id, stakeholder.name])
+);
+
 interface DataEntryFormProps {
   indicator: Indicator;
   value: number | string | boolean | null;
@@ -97,7 +101,7 @@ export default function DataEntryForm({
             )}
             {indicator.stakeholderAccess && indicator.stakeholderAccess.length > 0 && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
-                {indicator.stakeholderAccess.map((id) => STAKEHOLDERS.find((s) => s.id === id)?.name || id).join(", ")}
+                {indicator.stakeholderAccess.map((id) => STAKEHOLDER_NAME_BY_ID.get(id) || id).join(", ")}
               </span>
             )}
             {lowerBetter && (
