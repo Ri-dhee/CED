@@ -16,6 +16,10 @@ export interface ManagedUser {
   stakeholderId: string;
   dzongkhagId: string;
   thromdeId: string | null;
+  allowedDomainIds: string[];
+  allowedIndicatorIds: string[];
+  allowedDzongkhagIds: string[];
+  allowedThromdeIds: string[];
 }
 
 const STORAGE_KEY = "grme-managed-users";
@@ -36,9 +40,34 @@ function isManagedUser(value: unknown): value is ManagedUser {
   );
 }
 
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function normalizeManagedUser(value: unknown): ManagedUser | null {
+  if (!isManagedUser(value)) return null;
+  const user = value as ManagedUser;
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    passwordHash: user.passwordHash,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+    active: user.active,
+    stakeholderId: user.stakeholderId,
+    dzongkhagId: user.dzongkhagId,
+    thromdeId: user.thromdeId,
+    allowedDomainIds: toStringArray(user.allowedDomainIds),
+    allowedIndicatorIds: toStringArray(user.allowedIndicatorIds),
+    allowedDzongkhagIds: toStringArray(user.allowedDzongkhagIds),
+    allowedThromdeIds: toStringArray(user.allowedThromdeIds),
+  };
+}
+
 function sanitizeUsers(value: unknown): ManagedUser[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isManagedUser);
+  return value.map(normalizeManagedUser).filter((user): user is ManagedUser => Boolean(user));
 }
 
 // ── Password hashing ────────────────────────────────────────────
@@ -199,7 +228,13 @@ export function useManagedUsers() {
       password: string,
       stakeholderId?: string,
       dzongkhagId?: string,
-      thromdeId?: string
+      thromdeId?: string,
+      permissions?: {
+        allowedDomainIds?: string[];
+        allowedIndicatorIds?: string[];
+        allowedDzongkhagIds?: string[];
+        allowedThromdeIds?: string[];
+      }
     ): Promise<{ success: boolean; error?: string }> => {
       const existing = loadUsers();
       if (
@@ -222,6 +257,10 @@ export function useManagedUsers() {
         stakeholderId: role === "admin" ? "" : (stakeholderId || "planning"),
         dzongkhagId: role === "admin" ? "" : (dzongkhagId || "thimphu"),
         thromdeId: thromdeId || null,
+        allowedDomainIds: permissions?.allowedDomainIds || [],
+        allowedIndicatorIds: permissions?.allowedIndicatorIds || [],
+        allowedDzongkhagIds: permissions?.allowedDzongkhagIds || [],
+        allowedThromdeIds: permissions?.allowedThromdeIds || [],
       };
 
       const updated = [...existing, newUser];

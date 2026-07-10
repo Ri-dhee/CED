@@ -40,7 +40,15 @@ CREATE TABLE framework (
   last_updated TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. managed_users
+-- 4. thromdes
+CREATE TABLE thromdes (
+  id TEXT PRIMARY KEY,
+  dzongkhag_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. managed_users
 CREATE TABLE managed_users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -48,10 +56,17 @@ CREATE TABLE managed_users (
   password_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_login_at TIMESTAMPTZ,
-  active BOOLEAN DEFAULT true
+  active BOOLEAN DEFAULT true,
+  stakeholder_id TEXT DEFAULT '',
+  dzongkhag_id TEXT DEFAULT '',
+  thromde_id TEXT REFERENCES thromdes(id) ON DELETE SET NULL,
+  allowed_domain_ids JSONB DEFAULT '[]'::jsonb,
+  allowed_indicator_ids JSONB DEFAULT '[]'::jsonb,
+  allowed_dzongkhag_ids JSONB DEFAULT '[]'::jsonb,
+  allowed_thromde_ids JSONB DEFAULT '[]'::jsonb
 );
 
--- 5. config (health check)
+-- 6. config (health check)
 CREATE TABLE config (
   key TEXT PRIMARY KEY,
   value TEXT
@@ -66,6 +81,9 @@ CREATE POLICY "Allow all" ON audit_log FOR ALL USING (true);
 
 ALTER TABLE framework ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON framework FOR ALL USING (true);
+
+ALTER TABLE thromdes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON thromdes FOR ALL USING (true);
 
 ALTER TABLE managed_users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON managed_users FOR ALL USING (true);

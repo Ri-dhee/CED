@@ -9,7 +9,7 @@ import {
 } from "@/lib/grme-data";
 import { useGRMEData } from "@/lib/grme-store";
 import { useGRMEFramework } from "@/lib/grme-framework-store";
-import { useGrmeUser, canEditFramework, canAccessDzongkhag, getAccessibleDzongkhags, GrmeUser, canEnterDataDuringWindow } from "@/lib/grme-user";
+import { useGrmeUser, canEditFramework, canAccessDzongkhag, canAccessThromde, getAccessibleDzongkhags, GrmeUser, canEnterDataDuringWindow } from "@/lib/grme-user";
 import {
   exportYearCsv,
   exportAllYearsCsv,
@@ -283,7 +283,7 @@ function GRMEApp({
 
   const isAdmin = canEditFramework(user.role);
   const dataEntryOpen = canEnterDataDuringWindow(user, dataEntryWindow);
-  const canEdit = dataEntryOpen && canAccessDzongkhag(user, selectedCity);
+  const canEdit = dataEntryOpen && (selectedThromdeId ? canAccessThromde(user, selectedThromdeId) : canAccessDzongkhag(user, selectedCity));
   const accessibleDzongkhags = getAccessibleDzongkhags(user);
   const currentScopeLabel = selectedThromdeId
     ? `Thromde: ${availableThromdes.find((t) => t.id === selectedThromdeId)?.name || selectedThromdeId}`
@@ -1069,6 +1069,7 @@ function GRMEApp({
           adminEvents={adminEvents}
           adminName={user.name}
           onRefreshData={refreshData}
+          domains={framework.domains}
         />
       )}
     </div>

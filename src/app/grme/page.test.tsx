@@ -24,6 +24,7 @@ vi.mock("@/lib/grme-user", () => ({
   canEnterData: (role: string) => role === "admin" || role === "editor",
   canEnterDataDuringWindow: (user: { role: string }) => user.role === "admin" || user.role === "editor",
   canAccessDzongkhag: () => true,
+  canAccessThromde: () => true,
   getAccessibleDzongkhags: () => ([{ id: "thimphu", name: "Thimphu" }]),
 }));
 

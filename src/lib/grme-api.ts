@@ -82,6 +82,10 @@ function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 async function loadConfigValue(key: string): Promise<string | null> {
   const { data, error } = await supabase()
     .from("config")
@@ -500,6 +504,10 @@ export async function loadUsers(): Promise<ManagedUser[]> {
     stakeholderId: u.stakeholder_id || "",
     dzongkhagId: u.dzongkhag_id || "",
     thromdeId: u.thromde_id || null,
+    allowedDomainIds: normalizeStringArray(u.allowed_domain_ids),
+    allowedIndicatorIds: normalizeStringArray(u.allowed_indicator_ids),
+    allowedDzongkhagIds: normalizeStringArray(u.allowed_dzongkhag_ids),
+    allowedThromdeIds: normalizeStringArray(u.allowed_thromde_ids),
   }));
 }
 
@@ -515,6 +523,10 @@ export async function saveUsers(users: ManagedUser[], actor?: string): Promise<v
     stakeholder_id: u.stakeholderId || "",
     dzongkhag_id: u.dzongkhagId || "",
     thromde_id: u.thromdeId || null,
+    allowed_domain_ids: u.allowedDomainIds || [],
+    allowed_indicator_ids: u.allowedIndicatorIds || [],
+    allowed_dzongkhag_ids: u.allowedDzongkhagIds || [],
+    allowed_thromde_ids: u.allowedThromdeIds || [],
   }));
 
   await withWriteRetry("saveUsers", async () => {

@@ -23,7 +23,7 @@ import {
 } from "./grme-data";
 import * as api from "./grme-api";
 import { supabase, hasSupabaseConfig, isStrictFreeTierMode } from "./supabase";
-import { DataEntryWindowConfig, GrmeUser, canAccessDzongkhag, canAccessIndicator, canEnterDataDuringWindow, getAccessibleDzongkhags } from "./grme-user";
+import { DataEntryWindowConfig, GrmeUser, canAccessDzongkhag, canAccessIndicator, canAccessThromde, canEnterDataDuringWindow, getAccessibleDzongkhags } from "./grme-user";
 
 const STORAGE_KEY = "grme-data";
 const MIGRATION_SENTINEL_KEY = "grme-migration-v1";
@@ -885,7 +885,7 @@ export function useGRMEData(
 
   const createYear = useCallback(
     async (year: number, copyFrom?: number) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
       let indicators: Record<string, IndicatorData> = {};
       let auditLog: AuditLog[] = [];
 
@@ -963,7 +963,7 @@ export function useGRMEData(
 
   const deleteYear = useCallback(
     async (year: number) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
       const city = ensureCity(activeCityId);
       const newAssessments = { ...city.assessments };
       const nextThromdeAssessments = { ...(city.thromdeAssessments || {}) };
@@ -1009,9 +1009,9 @@ export function useGRMEData(
 
   const updateIndicator = useCallback(
     async (indicatorId: string, value: number | string | boolean, notes?: string) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
       const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
-      if (user && indicator && !canAccessIndicator(user, indicator)) return;
+      if (user && indicator && !canAccessIndicator(user, indicator, domainsRef.current)) return;
       const city = ensureCity(activeCityId);
       const assess = getOrCreateScopedAssessment(city, currentYear, selectedThromde?.id);
       const existing = assess.indicators[indicatorId];
@@ -1130,9 +1130,9 @@ export function useGRMEData(
 
   const addAuditNote = useCallback(
     async (indicatorId: string, note: string) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !canAccessDzongkhag(user, activeCityId))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
       const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
-      if (user && indicator && !canAccessIndicator(user, indicator)) return;
+      if (user && indicator && !canAccessIndicator(user, indicator, domainsRef.current)) return;
       const city = ensureCity(activeCityId);
       const assess = getOrCreateScopedAssessment(city, currentYear, selectedThromde?.id);
 

@@ -94,7 +94,16 @@ async function verifyLogin(
     if (!expected || !password) return null;
     const valid = await bcrypt.compare(password, expected);
     if (!valid) return null;
-    return { name: normalizedName, role: "admin", loginAt: new Date().toISOString(), scope: DEFAULT_SCOPE };
+    return {
+      name: normalizedName,
+      role: "admin",
+      loginAt: new Date().toISOString(),
+      scope: DEFAULT_SCOPE,
+      allowedDomainIds: [],
+      allowedIndicatorIds: [],
+      allowedDzongkhagIds: [],
+      allowedThromdeIds: [],
+    };
   }
 
   if (!password && existingSession?.role === "admin") {
@@ -103,6 +112,10 @@ async function verifyLogin(
       role,
       loginAt: new Date().toISOString(),
       scope: existingSession.scope || DEFAULT_SCOPE,
+      allowedDomainIds: existingSession.allowedDomainIds || [],
+      allowedIndicatorIds: existingSession.allowedIndicatorIds || [],
+      allowedDzongkhagIds: existingSession.allowedDzongkhagIds || [],
+      allowedThromdeIds: existingSession.allowedThromdeIds || [],
     };
   }
 
@@ -122,6 +135,10 @@ async function verifyLogin(
         thromdeId: found.thromdeId,
         stakeholderId: found.stakeholderId,
       },
+      allowedDomainIds: found.allowedDomainIds || [],
+      allowedIndicatorIds: found.allowedIndicatorIds || [],
+      allowedDzongkhagIds: found.allowedDzongkhagIds || [],
+      allowedThromdeIds: found.allowedThromdeIds || [],
     };
   }
 

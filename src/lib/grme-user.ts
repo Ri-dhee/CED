@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { CITIES, Indicator } from "./grme-data";
+import { CITIES, THROMDES, Domain, Indicator } from "./grme-data";
 
 export type UserRole = "admin" | "editor" | "viewer";
 
@@ -22,6 +22,10 @@ export interface GrmeUser {
   role: UserRole;
   loginAt: string;
   scope: UserScope;
+  allowedDomainIds?: string[];
+  allowedIndicatorIds?: string[];
+  allowedDzongkhagIds?: string[];
+  allowedThromdeIds?: string[];
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -74,6 +78,20 @@ export function canEnterData(role: UserRole): boolean {
   return role === "admin" || role === "editor";
 }
 
+function getIndicatorDomainId(domains: Domain[] | undefined, indicatorId: string): string | null {
+  if (!domains) return null;
+  for (const domain of domains) {
+    if (domain.subdomains.some((subdomain) => subdomain.indicators.some((indicator) => indicator.id === indicatorId))) {
+      return domain.id;
+    }
+  }
+  return null;
+}
+
+function getThromdeDzongkhagId(thromdeId: string): string | null {
+  return THROMDES.find((thromde) => thromde.id === thromdeId)?.dzongkhagId || null;
+}
+
 export function canEnterDataDuringWindow(
   user: GrmeUser,
   window: DataEntryWindowConfig | null,
@@ -90,25 +108,56 @@ export function canEnterDataDuringWindow(
   return current >= start && current <= end;
 }
 
+export function canAccessThromde(user: GrmeUser, thromdeId: string): boolean {
+  if (user.role === "admin") return true;
+  if (!thromdeId) return false;
+
+  const dzongkhagId = getThromdeDzongkhagId(thromdeId);
+  if (dzongkhagId && user.allowedDzongkhagIds?.includes(dzongkhagId)) return true;
+
+  const allowedThromdeIds = user.allowedThromdeIds || [];
+  if (allowedThromdeIds.includes(thromdeId)) return true;
+
+  if (dzongkhagId && user.scope.dzongkhagId === dzongkhagId) return true;
+  return user.scope.thromdeId === thromdeId;
+}
+
 /** Returns the list of dzongkhags a user is allowed to see. */
 export function getAccessibleDzongkhags(user: GrmeUser): typeof CITIES {
   if (user.role === "admin") return CITIES;
-  if (user.scope.dzongkhagId) {
-    const match = CITIES.find((c) => c.id === user.scope.dzongkhagId);
-    return match ? [match] : [];
+  const visibleIds = new Set<string>();
+
+  if (user.scope.dzongkhagId) visibleIds.add(user.scope.dzongkhagId);
+  for (const id of user.allowedDzongkhagIds || []) visibleIds.add(id);
+  for (const thromdeId of user.allowedThromdeIds || []) {
+    const dzongkhagId = getThromdeDzongkhagId(thromdeId);
+    if (dzongkhagId) visibleIds.add(dzongkhagId);
   }
-  return [];
+  if (user.scope.thromdeId) {
+    const dzongkhagId = getThromdeDzongkhagId(user.scope.thromdeId);
+    if (dzongkhagId) visibleIds.add(dzongkhagId);
+  }
+
+  return CITIES.filter((city) => visibleIds.has(city.id));
 }
 
 /** True if the user can edit data in the given dzongkhag. */
 export function canAccessDzongkhag(user: GrmeUser, dzongkhagId: string): boolean {
   if (user.role === "admin") return true;
+  if (user.allowedDzongkhagIds?.includes(dzongkhagId)) return true;
+  if (user.allowedThromdeIds?.some((thromdeId) => getThromdeDzongkhagId(thromdeId) === dzongkhagId)) return true;
   return user.scope.dzongkhagId === dzongkhagId;
 }
 
-/** True if the user can edit a specific indicator (checks stakeholder access). */
-export function canAccessIndicator(user: GrmeUser, indicator: Indicator): boolean {
+export function canAccessIndicator(
+  user: GrmeUser,
+  indicator: Indicator,
+  domains?: Domain[]
+): boolean {
   if (user.role === "admin") return true;
+  if (user.allowedIndicatorIds?.includes(indicator.id)) return true;
+  const domainId = getIndicatorDomainId(domains, indicator.id);
+  if (domainId && user.allowedDomainIds?.includes(domainId)) return true;
   if (!indicator.stakeholderAccess || indicator.stakeholderAccess.length === 0) return false;
   return indicator.stakeholderAccess.includes(user.scope.stakeholderId);
 }

@@ -5,6 +5,10 @@ export interface GrmeSessionUser {
   role: UserRole;
   loginAt: string;
   scope?: UserScope;
+  allowedDomainIds?: string[];
+  allowedIndicatorIds?: string[];
+  allowedDzongkhagIds?: string[];
+  allowedThromdeIds?: string[];
 }
 
 export const GRME_SESSION_COOKIE = "grme-session";

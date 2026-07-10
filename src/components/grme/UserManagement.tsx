@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   useManagedUsers,
 } from "@/lib/grme-managed-users";
@@ -9,7 +9,7 @@ import {
   ROLE_LABELS,
   ROLE_COLORS,
 } from "@/lib/grme-user";
-import { CITIES, THROMDES, STAKEHOLDERS } from "@/lib/grme-data";
+import { CITIES, Domain, THROMDES, STAKEHOLDERS } from "@/lib/grme-data";
 import { DataEntryWindowConfig } from "@/lib/grme-user";
 import { saveDataEntryWindowConfig, recordAdminEvent } from "@/lib/grme-api";
 import type { AuditLog } from "@/lib/grme-data";
@@ -20,6 +20,7 @@ interface UserManagementProps {
   adminEvents: AuditLog[];
   adminName: string;
   onRefreshData: () => void | Promise<void>;
+  domains: Domain[];
 }
 
 const ROLES: UserRole[] = ["admin", "editor", "viewer"];
@@ -32,7 +33,7 @@ function toLocalInputValue(value: string | null | undefined): string {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-export default function UserManagement({ onClose, dataEntryWindow, adminEvents, adminName, onRefreshData }: UserManagementProps) {
+export default function UserManagement({ onClose, dataEntryWindow, adminEvents, adminName, onRefreshData, domains }: UserManagementProps) {
   const {
     users,
     addUser,
@@ -65,7 +66,21 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
   const [windowEnd, setWindowEnd] = useState("");
   const [windowSaving, setWindowSaving] = useState(false);
   const [windowError, setWindowError] = useState("");
+  const [newAllowedDomainIds, setNewAllowedDomainIds] = useState<string[]>([]);
+  const [newAllowedIndicatorIds, setNewAllowedIndicatorIds] = useState<string[]>([]);
+  const [newAllowedDzongkhagIds, setNewAllowedDzongkhagIds] = useState<string[]>([]);
+  const [newAllowedThromdeIds, setNewAllowedThromdeIds] = useState<string[]>([]);
   const windowHistory = adminEvents.filter((log) => log.indicatorId === "admin:data-entry-window");
+  const toggleSelection = (value: string, list: string[], setList: Dispatch<SetStateAction<string[]>>) => {
+    setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+  };
+
+  const clearNewAccessSelections = () => {
+    setNewAllowedDomainIds([]);
+    setNewAllowedIndicatorIds([]);
+    setNewAllowedDzongkhagIds([]);
+    setNewAllowedThromdeIds([]);
+  };
 
   useEffect(() => {
     setWindowEnabled(Boolean(dataEntryWindow?.enabled));
@@ -87,7 +102,20 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
       return;
     }
 
-    const result = await addUser(newName.trim(), newRole, newPassword, newStakeholder, newDzongkhag, newThromde || undefined);
+    const result = await addUser(
+      newName.trim(),
+      newRole,
+      newPassword,
+      newStakeholder,
+      newDzongkhag,
+      newThromde || undefined,
+      {
+        allowedDomainIds: newAllowedDomainIds,
+        allowedIndicatorIds: newAllowedIndicatorIds,
+        allowedDzongkhagIds: newAllowedDzongkhagIds,
+        allowedThromdeIds: newAllowedThromdeIds,
+      }
+    );
     if (!result.success) {
       setError(result.error || "Failed to add user");
       return;
@@ -100,6 +128,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
     setNewStakeholder("planning");
     setNewDzongkhag("thimphu");
     setNewThromde("");
+    clearNewAccessSelections();
     setShowAddForm(false);
     setError("");
   };
@@ -177,7 +206,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -295,6 +324,90 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                   />
                 </div>
               </div>
+              {newRole !== "admin" ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Permissions</h4>
+                      <p className="text-[11px] text-slate-400">Tick the areas this user may access.</p>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      {newAllowedDomainIds.length} domains, {newAllowedIndicatorIds.length} indicators, {newAllowedDzongkhagIds.length} dzongkhags, {newAllowedThromdeIds.length} thromdes
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-500 mb-2">Dzongkhags</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {CITIES.map((city) => (
+                          <label key={city.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={newAllowedDzongkhagIds.includes(city.id)}
+                              onChange={() => toggleSelection(city.id, newAllowedDzongkhagIds, setNewAllowedDzongkhagIds)}
+                            />
+                            <span>{city.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-500 mb-2">Thromdes</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {THROMDES.map((thromde) => (
+                          <label key={thromde.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={newAllowedThromdeIds.includes(thromde.id)}
+                              onChange={() => toggleSelection(thromde.id, newAllowedThromdeIds, setNewAllowedThromdeIds)}
+                            />
+                            <span>{thromde.name}</span>
+                            <span className="text-[10px] text-slate-400 ml-auto">{CITIES.find((c) => c.id === thromde.dzongkhagId)?.name || thromde.dzongkhagId}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-500 mb-2">Domains and indicators</div>
+                      <div className="space-y-2">
+                        {domains.map((domain) => (
+                          <div key={domain.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-800">
+                              <input
+                                type="checkbox"
+                                checked={newAllowedDomainIds.includes(domain.id)}
+                                onChange={() => toggleSelection(domain.id, newAllowedDomainIds, setNewAllowedDomainIds)}
+                              />
+                              <span>{domain.shortName}</span>
+                              <span className="text-slate-400 font-normal">{domain.name}</span>
+                            </label>
+                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {domain.subdomains.flatMap((subdomain) => subdomain.indicators).map((indicator) => (
+                                <label key={indicator.id} className="flex items-start gap-2 rounded-lg bg-white border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    className="mt-0.5"
+                                    checked={newAllowedIndicatorIds.includes(indicator.id)}
+                                    onChange={() => toggleSelection(indicator.id, newAllowedIndicatorIds, setNewAllowedIndicatorIds)}
+                                  />
+                                  <span>{indicator.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  Admin users already have full access.
+                </div>
+              )}
               {error && (
                 <p className="text-xs text-red-500">{error}</p>
               )}
@@ -306,7 +419,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                   Create User
                 </button>
                 <button
-                  onClick={() => { setShowAddForm(false); setError(""); }}
+                  onClick={() => { setShowAddForm(false); setError(""); clearNewAccessSelections(); }}
                   className="px-4 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel

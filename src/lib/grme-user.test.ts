@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { canAccessIndicator } from "./grme-user";
+import { canAccessIndicator, canAccessDzongkhag, canAccessThromde } from "./grme-user";
 import type { GrmeUser } from "./grme-user";
-import type { Indicator } from "./grme-data";
+import type { Domain, Indicator } from "./grme-data";
 
 function user(overrides: Partial<GrmeUser> = {}): GrmeUser {
   return {
@@ -27,6 +27,26 @@ function indicator(overrides: Partial<Indicator> = {}): Indicator {
   };
 }
 
+function domains(): Domain[] {
+  return [
+    {
+      id: "mobility-access",
+      name: "Mobility",
+      shortName: "Mobility",
+      description: "Test domain",
+      icon: "",
+      color: "",
+      subdomains: [
+        {
+          id: "access",
+          name: "Access",
+          indicators: [indicator({ id: "ind-1" }), indicator({ id: "ind-2" })],
+        },
+      ],
+    },
+  ];
+}
+
 describe("canAccessIndicator", () => {
   it("allows matching stakeholders", () => {
     expect(canAccessIndicator(user(), indicator({ stakeholderAccess: ["planning"] }))).toBe(true);
@@ -42,5 +62,20 @@ describe("canAccessIndicator", () => {
 
   it("always allows admins", () => {
     expect(canAccessIndicator(user({ role: "admin" }), indicator())).toBe(true);
+  });
+
+  it("allows domain-scoped users when the indicator belongs to that domain", () => {
+    expect(canAccessIndicator(user({ allowedDomainIds: ["mobility-access"] }), indicator(), domains())).toBe(true);
+  });
+});
+
+describe("canAccessDzongkhag", () => {
+  it("allows dzongkhag-scoped permissions", () => {
+    expect(canAccessDzongkhag(user({ allowedDzongkhagIds: ["punakha"] }), "punakha")).toBe(true);
+  });
+
+  it("allows thromde-scoped permissions for the parent dzongkhag", () => {
+    expect(canAccessThromde(user({ allowedThromdeIds: ["thimphu-city"] }), "thimphu-city")).toBe(true);
+    expect(canAccessDzongkhag(user({ allowedThromdeIds: ["thimphu-city"] }), "thimphu")).toBe(true);
   });
 });
