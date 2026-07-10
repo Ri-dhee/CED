@@ -166,12 +166,12 @@ export default function Home() {
           <p className="text-white/80 text-lg mb-10 max-w-2xl mx-auto">
             Contact us to discuss how CED can support your environmental and development goals.
           </p>
-          <a
-            href="mailto:contact@ced-consult.com"
-            className="inline-flex px-8 py-4 bg-white text-primary-dark font-semibold rounded-xl shadow-xl hover:shadow-2xl transition-all hover:scale-105"
-          >
-            contact@ced-consult.com
-          </a>
+            <a
+              href="mailto:ced.bhutan@gmail.com"
+              className="inline-flex px-8 py-4 bg-white text-primary-dark font-semibold rounded-xl shadow-xl hover:shadow-2xl transition-all hover:scale-105"
+            >
+              ced.bhutan@gmail.com
+            </a>
         </div>
       </section>
     </div>

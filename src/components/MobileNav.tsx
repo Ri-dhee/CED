@@ -153,7 +153,7 @@ export default function MobileNav() {
             )
           )}
           <a
-            href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@ced-consult.com&subject=CED%20Inquiry"
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=ced.bhutan@gmail.com&subject=CED%20Inquiry"
             target="_blank"
             rel="noopener noreferrer"
             onClick={closeNav}

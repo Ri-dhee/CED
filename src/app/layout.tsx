@@ -93,7 +93,7 @@ export default function RootLayout({
                 "@type": "ContactPoint",
                 telephone: "+975-2-324456",
                 contactType: "customer service",
-                email: "contact@ced-consult.com",
+                email: "ced.bhutan@gmail.com",
               },
               sameAs: [],
             }),
