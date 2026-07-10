@@ -274,8 +274,8 @@ export const DEFAULT_DOMAINS: Domain[] = [
   ),
   domain(
     "health-wash",
-    "Health and Hygiene (WASH)",
-    "Health",
+    "Water, Sanitation, and Hygiene (WASH)",
+    "WASH",
     "Equitable access to gender-responsive health, WASH, and social services in Bhutan's mountain urban centres.",
     "heart",
     "#06b6d4",
