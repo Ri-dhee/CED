@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Analytics } from "@vercel/analytics/react";
 import MobileNav from "@/components/MobileNav";
 import "./globals.css";
-import logoCed from "../../../logo_ced.png";
+import logoCed from "../../logo_ced.png";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
