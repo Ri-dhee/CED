@@ -425,6 +425,32 @@ function GRMEApp({
                 />
               </div>
             </div>
+            {isAdmin && (
+              <div
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  dataEntryOpen
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+                }`}
+              >
+                {dataEntryOpen
+                  ? "Admin window is open. Editors can enter data right now."
+                  : "Admin window is closed. Editors are currently blocked from entering data."}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="pb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <span className="font-medium">Transparency note:</span> data entry access is managed by admins and all window changes are recorded in the audit trail.
+            {dataEntryWindow?.enabled && dataEntryWindow.startAt && dataEntryWindow.endAt ? (
+              <span> Current window: {new Date(dataEntryWindow.startAt).toLocaleString()} - {new Date(dataEntryWindow.endAt).toLocaleString()}.</span>
+            ) : (
+              <span> Current status: closed unless an admin opens a window.</span>
+            )}
           </div>
         </div>
       </section>
