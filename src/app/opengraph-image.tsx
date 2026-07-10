@@ -19,34 +19,55 @@ export default function Image() {
     >
       <div
         style={{
-          fontSize: 72,
+          fontSize: 64,
           fontWeight: 800,
           color: "#fff",
           letterSpacing: "-0.02em",
           lineHeight: 1.1,
         }}
       >
-        CED
+        Centre for Environment and Development
       </div>
       <div
         style={{
-          fontSize: 36,
-          color: "#a7f3d0",
+          fontSize: 30,
+          color: "#d1fae5",
           letterSpacing: "-0.01em",
           marginTop: 16,
         }}
       >
-        Center for Environment & Development
+        Research and Consultancy Services
       </div>
       <div
         style={{
           fontSize: 24,
-          color: "#6ee7b7",
-          marginTop: 32,
-          opacity: 0.8,
+          color: "#a7f3d0",
+          marginTop: 30,
+          maxWidth: 980,
+          lineHeight: 1.4,
         }}
       >
-        Environmental Management & Sustainable Development
+        Chhagoedhing, Dolaygang Road, Simtokha E4 zone, Thimphu Thromde, Bhutan
+      </div>
+      <div
+        style={{
+          fontSize: 24,
+          color: "#a7f3d0",
+          marginTop: 18,
+          lineHeight: 1.4,
+        }}
+      >
+        Website: www.cedbhutan.com
+      </div>
+      <div
+        style={{
+          fontSize: 24,
+          color: "#a7f3d0",
+          marginTop: 8,
+          lineHeight: 1.4,
+        }}
+      >
+        Email: ced.bhutan@gmail.com
       </div>
     </div>,
     size,
