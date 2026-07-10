@@ -40,6 +40,10 @@ export const metadata: Metadata = {
     description:
       "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
   },
+  icons: {
+    icon: "/icon",
+    apple: "/apple-icon",
+  },
   robots: {
     index: true,
     follow: true,
@@ -82,7 +86,7 @@ export default function RootLayout({
               name: "Center for Environment & Development",
               alternateName: "CED",
               url: "https://ced-neon.vercel.app",
-              logo: "https://ced-neon.vercel.app/logo.svg",
+              logo: "https://ced-neon.vercel.app/logo-ced",
               description:
                 "Premier private consultation firm specializing in environmental management, sustainable development, and policy advisory.",
               contactPoint: {
