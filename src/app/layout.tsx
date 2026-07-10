@@ -106,9 +106,13 @@ export default function RootLayout({
         <header className="fixed top-0 left-0 right-0 z-50 glass" role="banner">
           <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between" aria-label="Main navigation">
             <Link href="/" className="flex items-center gap-2 sm:gap-3 group" aria-label="CED Home">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow overflow-hidden">
-                <Image src={logoCed} alt="CED logo" width={40} height={40} className="h-full w-full object-contain p-0.5" />
-              </div>
+              <Image
+                src={logoCed}
+                alt="CED logo"
+                width={52}
+                height={52}
+                className="h-10 w-10 sm:h-12 sm:w-12 object-contain shrink-0"
+              />
               <div className="hidden sm:block">
                 <span className="font-bold text-gray-900 block leading-tight">
                   Center for Environment
@@ -166,9 +170,13 @@ export default function RootLayout({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
               <div className="lg:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center backdrop-blur overflow-hidden">
-                    <Image src={logoCed} alt="CED logo" width={40} height={40} className="h-full w-full object-contain p-0.5" />
-                  </div>
+                  <Image
+                    src={logoCed}
+                    alt="CED logo"
+                    width={52}
+                    height={52}
+                    className="h-10 w-10 sm:h-12 sm:w-12 object-contain shrink-0"
+                  />
                   <div>
                     <span className="font-bold text-white block leading-tight">Center for Environment</span>
                     <span className="text-xs text-white/60">& Development</span>
