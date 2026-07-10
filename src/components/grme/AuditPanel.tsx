@@ -83,13 +83,13 @@ export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelP
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <h3 className="text-lg font-bold text-gray-900">Audit Trail</h3>
         <span className="text-sm text-gray-400">{allEntries.length} entries</span>
       </div>
 
-      <div className="flex gap-2 mb-4" role="group" aria-label="Filter audit entries">
+      <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filter audit entries">
         {(["all", "create", "update", "review"] as const).map((f) => (
           <button
             key={f}
@@ -107,12 +107,12 @@ export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelP
       </div>
 
       <div className="mb-6">
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <select
             value={noteIndicator}
             onChange={(e) => setNoteIndicator(e.target.value)}
             aria-label="Select indicator to review"
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
           >
             <option value="">Select indicator to review...</option>
             {domains.flatMap((d) =>
@@ -126,13 +126,13 @@ export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelP
             )}
           </select>
         </div>
-        <div className="flex gap-2 mt-2">
+        <div className="flex flex-col sm:flex-row gap-2 mt-2">
           <input
             type="text"
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             placeholder="Add review note..."
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
             onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
           />
           <button
@@ -154,7 +154,7 @@ export default function AuditPanel({ domains, auditLog, onAddNote }: AuditPanelP
           filtered.map((entry, i) => (
             <div
               key={entry.id || i}
-              className="flex gap-3 p-3 bg-gray-50 rounded-xl"
+              className="flex gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100"
             >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${getActionColor(entry.action)}`}>
                 {getActionIcon(entry.action)}

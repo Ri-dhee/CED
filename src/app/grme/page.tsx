@@ -324,11 +324,11 @@ function GRMEApp({
       {/* Dzongkhag + Year Selector + Stats Bar + User Badge */}
       <section className="pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-600">
-                Dzongkhag:
-              </label>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-600">
+                  Dzongkhag:
+                </label>
               <select
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
@@ -360,64 +360,48 @@ function GRMEApp({
                 </select>
               </div>
             )}
-            <div className="h-4 w-px bg-gray-200 hidden sm:block" />
-            <YearSelector
-              selectedYear={selectedYear}
-              availableYears={availableYears}
-              onYearChange={setSelectedYear}
-              onCreateYear={trackedCreateYear}
-              onDeleteYear={trackedDeleteYear}
-            />
-            <div className="h-4 w-px bg-gray-200 hidden sm:block" />
-            <ExportButton
-              onExportCurrent={() =>
-                exportYearCsv(framework.domains, cityData, selectedYear)
-              }
-              onExportAll={() =>
-                exportAllYearsCsv(framework.domains, cityData, availableYears)
-              }
-              onExportSummary={() =>
-                exportSummaryCsv(framework.domains, cityData, availableYears)
-              }
-            />
-            <div className="flex-1" />
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-6 text-sm">
-                <div>
-                  <span className="text-gray-400">Data Entry:</span>
-                  <span
-                    className="ml-2 font-bold"
-                    style={{ color: overallColor }}
-                  >
-                    {stats.filled}/{stats.total}
-                  </span>
-                  <span className="ml-1 text-gray-400">
-                    ({stats.percentage}%)
-                  </span>
-                </div>
-                <div className="h-4 w-px bg-gray-200" />
-                <div>
-                  <span className="text-gray-400">Overall Score:</span>
-                  <span
-                    className="ml-2 text-xl font-bold"
-                    style={{ color: overallColor }}
-                  >
-                    {Math.round(overallScore)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Scope:</span>
-                  <span className="ml-2 font-semibold text-gray-700">{currentScopeLabel}</span>
-                </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <YearSelector
+                selectedYear={selectedYear}
+                availableYears={availableYears}
+                onYearChange={setSelectedYear}
+                onCreateYear={trackedCreateYear}
+                onDeleteYear={trackedDeleteYear}
+              />
+              <ExportButton
+                onExportCurrent={() =>
+                  exportYearCsv(framework.domains, cityData, selectedYear)
+                }
+                onExportAll={() =>
+                  exportAllYearsCsv(framework.domains, cityData, availableYears)
+                }
+                onExportSummary={() =>
+                  exportSummaryCsv(framework.domains, cityData, availableYears)
+                }
+              />
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${dataEntryOpen ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${dataEntryOpen ? "bg-emerald-500" : "bg-amber-500"}`} />
+                <span>{dataEntryOpen ? "Entry open" : "Entry closed"}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                <span className="text-slate-400">Data</span>
+                <span>{stats.filled}/{stats.total}</span>
+                <span className="text-slate-400">({stats.percentage}%)</span>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                <span className="text-slate-400">Score</span>
+                <span style={{ color: overallColor }}>
+                  {Math.round(overallScore)}
+                </span>
+              </div>
+              <div className="hidden md:inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600">
+                {currentScopeLabel}
+              </div>
+              <div className="ml-auto flex items-center gap-2">
                 {isAdmin && (
-                  <div className={`hidden sm:flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-medium ${dataEntryOpen ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                  <div className={`hidden lg:flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-medium ${dataEntryOpen ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${dataEntryOpen ? "bg-emerald-500" : "bg-amber-500"}`} />
-                    <span>{dataEntryOpen ? "Data entry open" : "Data entry closed"}</span>
-                    {dataEntryWindow?.enabled && dataEntryWindow.startAt && dataEntryWindow.endAt && (
-                      <span className="text-gray-500">{new Date(dataEntryWindow.startAt).toLocaleDateString()} - {new Date(dataEntryWindow.endAt).toLocaleDateString()}</span>
-                    )}
+                    <span>{dataEntryWindow?.enabled && dataEntryWindow.startAt && dataEntryWindow.endAt ? `${new Date(dataEntryWindow.startAt).toLocaleDateString()} - ${new Date(dataEntryWindow.endAt).toLocaleDateString()}` : (dataEntryOpen ? "Admin window open" : "Admin window closed")}</span>
                   </div>
                 )}
                 <ApiStatus apiAvailable={apiAvailable} onRefresh={refreshData} />

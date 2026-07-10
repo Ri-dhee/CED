@@ -71,8 +71,8 @@ export default function DataEntryForm({
   const b = indicator.benchmark;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
+    <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span
@@ -99,11 +99,6 @@ export default function DataEntryForm({
                 {indicator.validationStatus === "draft" ? "Needs review" : "Reviewed"}
               </span>
             )}
-            {indicator.stakeholderAccess && indicator.stakeholderAccess.length > 0 && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
-                {indicator.stakeholderAccess.map((id) => STAKEHOLDER_NAME_BY_ID.get(id) || id).join(", ")}
-              </span>
-            )}
             {lowerBetter && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-500">
                 Lower is better
@@ -112,6 +107,11 @@ export default function DataEntryForm({
           </div>
           <p className="text-sm font-medium text-gray-800">{indicator.name}</p>
           <p className="text-xs text-gray-400 mt-0.5">{indicator.description}</p>
+          {indicator.stakeholderAccess && indicator.stakeholderAccess.length > 0 && (
+            <p className="text-[10px] text-emerald-700 mt-1">
+              Access: {indicator.stakeholderAccess.map((id) => STAKEHOLDER_NAME_BY_ID.get(id) || id).join(", ")}
+            </p>
+          )}
           {indicator.validationStatus === "draft" && (
             <p className="text-[10px] text-amber-600 mt-1">
               This indicator is a draft and should be reviewed by an expert before final use.
@@ -186,10 +186,10 @@ export default function DataEntryForm({
           />
         )}
 
-        <div>
+        <div className="rounded-lg border border-gray-100 bg-gray-50/70 p-2">
           <button
             onClick={() => setShowBenchmark(!showBenchmark)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
           >
             {showBenchmark ? "Hide" : "Show"} benchmark targets
           </button>
@@ -226,7 +226,7 @@ export default function DataEntryForm({
           onChange={(e) => setNoteText(e.target.value)}
           placeholder="Add notes or evidence..."
           rows={2}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none bg-white"
         />
       </div>
     </div>
