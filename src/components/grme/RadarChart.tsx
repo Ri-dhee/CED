@@ -374,7 +374,7 @@ export default function RadarChart({
             </div>
           )}
           {onDomainClick && (
-            <div className="mt-1 text-[10px] text-slate-400">Click to view details</div>
+            <div className="mt-1 text-[10px] text-slate-500">Click to view details</div>
           )}
         </div>
       )}

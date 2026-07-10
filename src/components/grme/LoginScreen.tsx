@@ -102,7 +102,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome
           </h1>
-          <p className="text-gray-500">
+          <p className="text-slate-600">
             Enter your name and role to access the assessment dashboard
           </p>
         </div>
@@ -113,7 +113,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Your Name
             </label>
             <input
@@ -124,7 +124,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g. Tshering Dorji"
               maxLength={100}
-              className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors ${
+              className={`w-full px-4 py-2.5 border rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors ${
                 error ? "border-red-300" : "border-gray-200"
               }`}
               autoFocus
@@ -143,7 +143,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           {/* Role Selection — only show if no managed user matched */}
           {!matchedManagedUser && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Select Your Role
               </label>
               <div className="space-y-2" role="radiogroup" aria-label="User role">
@@ -182,7 +182,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                           >
                             {ROLE_LABELS[role]}
                           </span>
-                          <p className="text-[11px] text-gray-400 mt-0.5">
+                          <p className="mt-0.5 text-[11px] text-slate-500">
                             {ROLE_DESCRIPTIONS[role]}
                           </p>
                         </div>
@@ -256,7 +256,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </button>
         </form>
 
-        <p className="text-center text-[10px] text-gray-400 mt-4">
+        <p className="mt-4 text-center text-[10px] text-slate-500">
           Contact your administrator for account access.
         </p>
       </div>

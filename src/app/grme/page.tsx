@@ -51,7 +51,7 @@ export default function GRMEPage() {
   if (!user || !userLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center">
-        <div className="text-gray-400 text-sm">Loading...</div>
+        <div className="text-slate-500 text-sm">Loading...</div>
       </div>
     );
   }
@@ -336,7 +336,7 @@ function GRMEApp({
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-          <div className="text-gray-400 text-sm">Loading dashboard data...</div>
+          <div className="text-slate-500 text-sm">Loading dashboard data...</div>
         </div>
       </div>
     );
@@ -355,7 +355,7 @@ function GRMEApp({
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
               GRME <span className="gradient-text">Index</span>
             </h1>
-            <p className="text-lg text-gray-500">
+            <p className="text-lg text-slate-600">
               Enter data from field assessments. The dashboard updates in
               real-time.
             </p>
@@ -368,13 +368,13 @@ function GRMEApp({
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-4">
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-600">
+                <label className="text-sm font-medium text-slate-700">
                   Dzongkhag:
                 </label>
               <select
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 {accessibleDzongkhags.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -385,13 +385,13 @@ function GRMEApp({
             </div>
             {availableThromdes.length > 0 && (
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-600">
+                <label className="text-sm font-medium text-slate-700">
                   Thromde:
                 </label>
                 <select
                   value={selectedThromdeId}
                   onChange={(e) => setSelectedThromdeId(e.target.value)}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="">Dzongkhag total</option>
                   {availableThromdes.map((t) => (
@@ -429,17 +429,17 @@ function GRMEApp({
                 <span>{dataEntryOpen ? "Entry open" : "Entry closed"}</span>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                <span className="text-slate-400">Data</span>
+                <span className="text-slate-500">Data</span>
                 <span>{stats.filled}/{stats.total}</span>
-                <span className="text-slate-400">({stats.percentage}%)</span>
+                <span className="text-slate-500">({stats.percentage}%)</span>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                <span className="text-slate-400">Score</span>
+                <span className="text-slate-500">Score</span>
                 <span style={{ color: overallColor }}>
                   {Math.round(overallScore)}
                 </span>
               </div>
-              <div className="hidden md:inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600">
+              <div className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
                 {currentScopeLabel}
               </div>
               <div className="ml-auto flex items-center gap-2">
@@ -453,7 +453,7 @@ function GRMEApp({
                 {isAdmin && (
                   <button
                     onClick={() => setShowUserManagement(true)}
-                    className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+                    className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors border border-gray-200"
                     aria-label="User management"
                     title="Manage users"
                   >
@@ -619,26 +619,26 @@ function GRMEApp({
               <>
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Overall score</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Overall score</div>
                 <div className="mt-2 text-2xl font-bold" style={{ color: overallColor }}>{Math.round(overallScore)}</div>
-                <div className="mt-1 text-xs text-gray-500">{overallStatus} performance</div>
+                <div className="mt-1 text-xs text-slate-600">{overallStatus} performance</div>
               </div>
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Data confidence</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Data confidence</div>
                 <div className="mt-2 text-2xl font-bold text-slate-900">{stats.confidence}%</div>
-                <div className="mt-1 text-xs text-gray-500">Based on {stats.filled}/{stats.total} indicators</div>
+                <div className="mt-1 text-xs text-slate-600">Based on {stats.filled}/{stats.total} indicators</div>
               </div>
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Top domain</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Top domain</div>
                 <div className="mt-2 text-lg font-bold text-slate-900 truncate">{dashboardStrongestDomain?.domain.shortName || "None"}</div>
-                <div className="mt-1 text-xs text-gray-500">{dashboardStrongestDomain ? `${Math.round(dashboardStrongestDomain.score)} points` : "No score yet"}</div>
+                <div className="mt-1 text-xs text-slate-600">{dashboardStrongestDomain ? `${Math.round(dashboardStrongestDomain.score)} points` : "No score yet"}</div>
               </div>
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Year over year</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Year over year</div>
                 <div className={`mt-2 text-2xl font-bold ${dashboardOverallChange === null ? "text-slate-400" : dashboardOverallChange > 0 ? "text-emerald-600" : dashboardOverallChange < 0 ? "text-rose-500" : "text-slate-500"}`}>
                   {dashboardOverallChange === null ? "—" : `${dashboardOverallChange > 0 ? "+" : ""}${dashboardOverallChange}`}
                 </div>
-                <div className="mt-1 text-xs text-gray-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Add another year to compare"}</div>
+                <div className="mt-1 text-xs text-slate-600">{previousYear ? `${previousYear} to ${selectedYear}` : "Add another year to compare"}</div>
               </div>
             </div>
             
@@ -658,10 +658,10 @@ function GRMEApp({
                   showTrend
                 />
                 <div className="mt-4 text-center">
-                  <div className="text-xs font-medium text-gray-500">
+                  <div className="text-xs font-medium text-slate-600">
                     Confidence {stats.confidence}%
                   </div>
-                  <div className="text-[11px] text-gray-400 mt-1">
+                  <div className="mt-1 text-[11px] text-slate-500">
                     Based on {stats.filled}/{stats.total} indicators
                   </div>
                 </div>
@@ -675,11 +675,11 @@ function GRMEApp({
                     Domain Profile
                   </h2>
                   <div className="flex flex-wrap items-center gap-2 text-xs justify-end">
-                    <span className="text-gray-400">Layer:</span>
+                    <span className="text-slate-500">Layer:</span>
                     <select
                       value={overlayMode}
                       onChange={(e) => setOverlayMode(e.target.value as typeof overlayMode)}
-                      className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-gray-600"
+                      className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-slate-700"
                     >
                       <option value="auto">Auto (previous year)</option>
                       <option value="specific">Pick years</option>
@@ -687,7 +687,7 @@ function GRMEApp({
                     </select>
                     {overlayMode === "specific" && (
                       <div className="w-full flex flex-wrap items-center gap-2 pt-1">
-                        <span className="text-[11px] text-gray-400">Select one or more years:</span>
+                        <span className="text-[11px] text-slate-500">Select one or more years:</span>
                         {availableYears
                           .filter((year) => year !== selectedYear)
                           .map((year) => {
@@ -712,7 +712,7 @@ function GRMEApp({
                           <button
                             type="button"
                             onClick={() => setSelectedOverlayYears([])}
-                            className="px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-[11px] font-medium text-gray-500 hover:bg-gray-100"
+                            className="px-2 py-1 rounded-lg border border-gray-200 bg-slate-50 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
                           >
                             Clear
                           </button>
@@ -722,10 +722,10 @@ function GRMEApp({
                   </div>
                 </div>
                 {overlayYears.length > 0 && (
-                  <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
-                    <span className="text-gray-400">Layers:</span>
+                  <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] text-slate-600">
+                    <span className="text-slate-500">Layers:</span>
                     {overlayYears.map((year, idx) => (
-                      <span key={year} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 border border-gray-100">
+                      <span key={year} className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-1 border border-slate-100">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: YEAR_COLORS[idx % YEAR_COLORS.length] }} />
                         {year}
                       </span>

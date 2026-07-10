@@ -43,7 +43,7 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_20px_40px_rgba(15,23,42,0.12)] backdrop-blur">
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{label}</p>
       <div className="space-y-1">
         {payload.map((entry) => (
           <div key={entry.dataKey} className="flex items-center justify-between gap-4">
@@ -52,7 +52,7 @@ function ChartTooltip({
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-xs text-slate-600">{entry.name}</span>
+              <span className="text-xs text-slate-700">{entry.name}</span>
             </div>
             <span className="text-xs font-bold text-slate-900">
               {Math.round(entry.value)}
@@ -80,7 +80,7 @@ function ChartLegend({
             className="inline-block h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-[11px] text-gray-600">{entry.value}</span>
+          <span className="text-[11px] text-slate-700">{entry.value}</span>
         </div>
       ))}
     </div>
@@ -126,13 +126,13 @@ function OverviewTab({
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis
               dataKey="year"
-              tick={{ fontSize: 12, fill: "#6b7280" }}
+              tick={{ fontSize: 12, fill: "#475569" }}
               axisLine={{ stroke: "#e5e7eb" }}
               tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 11, fill: "#9ca3af" }}
+              tick={{ fontSize: 11, fill: "#64748b" }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => String(v)}
@@ -152,7 +152,7 @@ function OverviewTab({
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex h-64 items-center justify-center text-sm text-slate-400">
+        <div className="flex h-64 items-center justify-center text-sm text-slate-500">
           Add at least 2 years to see trends
         </div>
       )}
@@ -161,18 +161,18 @@ function OverviewTab({
       {sortedYears.length >= 2 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: `${sortedYears[0]}`, value: Math.round(first), color: "text-gray-700" },
-            { label: `${sortedYears[sortedYears.length - 1]}`, value: Math.round(last), color: "text-indigo-600" },
+            { label: `${sortedYears[0]}`, value: Math.round(first), color: "text-slate-800" },
+            { label: `${sortedYears[sortedYears.length - 1]}`, value: Math.round(last), color: "text-indigo-700" },
             {
               label: "Change",
               value: `${diff > 0 ? "+" : ""}${Math.round(diff)}`,
-              color: diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-gray-400",
+              color: diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-600" : "text-slate-500",
             },
-            { label: "Average", value: Math.round(avg), color: "text-blue-600" },
-            { label: "Range", value: `${Math.round(min)}–${Math.round(max)}`, color: "text-gray-600" },
+            { label: "Average", value: Math.round(avg), color: "text-sky-700" },
+            { label: "Range", value: `${Math.round(min)}–${Math.round(max)}`, color: "text-slate-700" },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-lg bg-gray-50 p-3 text-center">
-              <div className="text-[11px] font-medium text-gray-400 mb-1">{stat.label}</div>
+            <div key={stat.label} className="rounded-lg bg-slate-50 p-3 text-center">
+              <div className="mb-1 text-[11px] font-medium text-slate-500">{stat.label}</div>
               <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
             </div>
           ))}
@@ -249,7 +249,7 @@ function DomainsTab({
           </LineChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex h-64 items-center justify-center text-sm text-slate-400">
+        <div className="flex h-64 items-center justify-center text-sm text-slate-500">
           Add at least 2 years to see trends
         </div>
       )}
@@ -284,7 +284,7 @@ function DomainsTab({
                         ? "bg-green-50 text-green-600"
                         : diff < 0
                           ? "bg-red-50 text-red-500"
-                          : "bg-gray-50 text-gray-400"
+                        : "bg-slate-50 text-slate-500"
                     }`}
                   >
                     {diff > 0 ? "+" : ""}
@@ -346,7 +346,7 @@ function HeatmapTab({
 
   if (sortedYears.length < 2) {
     return (
-        <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+        <div className="flex h-48 items-center justify-center text-sm text-slate-500">
           Add at least 2 years to see heatmap
         </div>
     );
@@ -424,7 +424,7 @@ function HeatmapTab({
                             ? "text-green-600"
                             : diff < 0
                               ? "text-red-500"
-                              : "text-gray-400"
+                              : "text-slate-500"
                         }`}
                       >
                         {diff > 0 ? "+" : ""}
@@ -467,7 +467,7 @@ function HeatmapTab({
                   return (
                     <span
                       className={`text-xs font-bold ${
-                        diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-gray-400"
+                        diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-600" : "text-slate-500"
                       }`}
                     >
                       {diff > 0 ? "+" : ""}
@@ -575,7 +575,7 @@ export default function TrendChart({
                   ? "bg-green-50 text-green-700"
                   : overallDiff < 0
                     ? "bg-red-50 text-red-600"
-                    : "bg-gray-50 text-gray-500"
+                    : "bg-slate-50 text-slate-600"
               }`}
             >
               Overall: {overallDiff > 0 ? "+" : ""}

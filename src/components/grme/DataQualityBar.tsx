@@ -42,10 +42,10 @@ export default function DataQualityBar({
     <div className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-500">Coverage</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">Coverage</div>
           <h3 className="mt-1 text-base font-bold text-slate-900">Data Quality</h3>
         </div>
-        <div className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+          <div className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
           {stats.filled} / {stats.total}
         </div>
       </div>
@@ -53,10 +53,10 @@ export default function DataQualityBar({
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <div className="text-3xl font-black text-slate-900 tabular-nums">{stats.percentage}%</div>
-          <div className="text-xs text-slate-500">{stats.confidence}% confidence</div>
+          <div className="text-xs text-slate-600">{stats.confidence}% confidence</div>
         </div>
         <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-white px-3 py-2 text-right ring-1 ring-sky-100/60">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-500">Missing</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">Missing</div>
           <div className="text-sm font-bold text-slate-900">{stats.missing}</div>
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function DataQualityBar({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="text-[11px] text-slate-500">
+        <span className="text-[11px] text-slate-600">
           {stats.percentage >= 75
             ? "Excellent coverage"
             : stats.percentage >= 50

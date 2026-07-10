@@ -214,7 +214,7 @@ export default function InsightsPanel({
           >
             <span className="text-lg flex-shrink-0">{insight.icon}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+               <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
                 {insight.label}
               </div>
               <div className="truncate text-sm font-semibold text-slate-800">
