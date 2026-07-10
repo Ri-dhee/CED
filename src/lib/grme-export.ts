@@ -163,6 +163,88 @@ export function exportAllYearsCsv(
   downloadCsv(filename, csv);
 }
 
+// ── Sheet Values Export (wide format) ───────────────────────────
+
+export function exportSheetValuesCsv(
+  domains: Domain[],
+  city: CityData,
+  years: number[]
+) {
+  const sorted = [...years].sort((a, b) => a - b);
+  const headers = [
+    "Indicator ID",
+    "Domain",
+    "Sub-Domain",
+    "Indicator",
+    "Type",
+    "Data Type",
+    "Direction",
+    "Unit",
+    "Benchmark (Critical)",
+    "Benchmark (Developing)",
+    "Benchmark (Progressive)",
+    "Benchmark (Exemplary)",
+  ];
+
+  for (const year of sorted) {
+    headers.push(
+      `${year} Value`,
+      `${year} Score`,
+      `${year} Status`,
+      `${year} Notes`,
+      `${year} Updated By`,
+      `${year} Last Updated`
+    );
+  }
+
+  const rows: string[][] = [];
+
+  for (const domain of domains) {
+    for (const sub of domain.subdomains) {
+      for (const indicator of sub.indicators) {
+        const row = [
+          escapeCsv(indicator.id),
+          escapeCsv(domain.name),
+          escapeCsv(sub.name),
+          escapeCsv(indicator.name),
+          escapeCsv(indicator.type),
+          escapeCsv(indicator.dataType),
+          escapeCsv(indicator.direction),
+          escapeCsv(indicator.unit),
+          escapeCsv(indicator.benchmark.critical),
+          escapeCsv(indicator.benchmark.developing),
+          escapeCsv(indicator.benchmark.progressive),
+          escapeCsv(indicator.benchmark.exemplary),
+        ];
+
+        for (const year of sorted) {
+          const assessment = city.assessments[year];
+          const data = assessment?.indicators[indicator.id];
+          const score =
+            data?.value !== undefined && data?.value !== null && typeof data?.value !== "string"
+              ? calculateIndicatorScore(data.value as number | boolean, indicator)
+              : null;
+
+          row.push(
+            escapeCsv(data?.value ?? ""),
+            score !== null ? escapeCsv(Math.round(score)) : "",
+            score !== null ? escapeCsv(getStatus(score)) : "",
+            escapeCsv(data?.notes ?? ""),
+            escapeCsv(data?.updatedBy ?? ""),
+            escapeCsv(data?.lastUpdated ?? "")
+          );
+        }
+
+        rows.push(row);
+      }
+    }
+  }
+
+  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const filename = `grme-${city.cityName}-sheet-values.csv`;
+  downloadCsv(filename, csv);
+}
+
 // ── Summary Export (Domain Scores) ──────────────────────────────
 
 export function exportSummaryCsv(

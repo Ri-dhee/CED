@@ -169,8 +169,8 @@ export default function RadarChart({
         {/* Main polygon */}
         <polygon
           points={getPolygonPoints(scores)}
-          fill="rgba(5, 150, 105, 0.15)"
-          stroke="#059669"
+          fill="rgba(79, 70, 229, 0.14)"
+          stroke="#4f46e5"
           strokeWidth="2.5"
           className="transition-all duration-300"
         />
@@ -224,7 +224,7 @@ export default function RadarChart({
                   cy={point.y}
                   r="11"
                   fill="none"
-                  stroke="#9ca3af"
+                  stroke="#94a3b8"
                   strokeWidth="1.5"
                   strokeDasharray="3 2"
                   opacity="0.5"
@@ -250,8 +250,8 @@ export default function RadarChart({
                 x={point.x}
                 y={point.y - 10}
                 textAnchor="middle"
-                className={`text-[11px] font-semibold transition-all duration-200 ${
-                  isHovered ? "fill-gray-900" : "fill-gray-500"
+                className={`text-[11px] font-semibold uppercase tracking-[0.16em] transition-all duration-200 ${
+                  isHovered ? "fill-slate-900" : "fill-slate-500"
                 }`}
               >
                 {domain.shortName}
@@ -270,7 +270,7 @@ export default function RadarChart({
                 y={point.y + 6}
                 textAnchor="middle"
                 className={`text-[13px] font-bold transition-all duration-200 ${
-                  isHovered ? "fill-gray-900" : ""
+                  isHovered ? "fill-slate-900" : ""
                 }`}
                 style={!isHovered ? { fill: color } : undefined}
               >
@@ -285,8 +285,8 @@ export default function RadarChart({
           x={center}
           y={center - 10}
           textAnchor="middle"
-          className="text-[11px] font-semibold"
-          fill="#9ca3af"
+          className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+          fill="#94a3b8"
         >
           GRME
         </text>
@@ -310,7 +310,7 @@ export default function RadarChart({
             top: tooltipPos.y - 10,
           }}
         >
-          <div className="font-semibold text-gray-900 mb-1">
+          <div className="mb-1 font-semibold text-slate-900">
             {domains.find((d) => d.id === hoveredDomain)?.name}
           </div>
           <div className="flex items-center gap-2">
@@ -322,8 +322,8 @@ export default function RadarChart({
                 ),
               }}
             />
-            <span className="text-gray-600">Score:</span>
-            <span className="font-bold text-gray-900">
+            <span className="text-slate-500">Score:</span>
+            <span className="font-bold text-slate-900">
               {Math.round(scores[hoveredIndex])}
             </span>
           </div>
@@ -331,7 +331,7 @@ export default function RadarChart({
             const conf = getDomainConfidence?.(hoveredDomain!) ?? 100;
             return (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-gray-500">Confidence:</span>
+                <span className="text-slate-500">Confidence:</span>
                 <span
                   className={`font-semibold ${
                     isConfidenceReliable(conf)
@@ -352,7 +352,7 @@ export default function RadarChart({
               {comparisonScores && !multiComparisonSeries && (
                 <>
                   <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                  <span className="text-gray-600">{comparisonLabel || "Previous"}:</span>
+                  <span className="text-slate-500">{comparisonLabel || "Previous"}:</span>
                   <span className="font-bold text-indigo-600">
                     {Math.round(comparisonScores[hoveredIndex])}
                   </span>
@@ -363,7 +363,7 @@ export default function RadarChart({
                   {multiComparisonSeries.map((series) => (
                     <div key={series.label} className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: series.color }} />
-                      <span className="text-gray-600">{series.label}:</span>
+                      <span className="text-slate-500">{series.label}:</span>
                       <span className="font-bold" style={{ color: series.color }}>
                         {Math.round(series.values[hoveredIndex])}
                       </span>
@@ -374,7 +374,7 @@ export default function RadarChart({
             </div>
           )}
           {onDomainClick && (
-            <div className="text-gray-400 mt-1 text-[10px]">Click to view details</div>
+            <div className="mt-1 text-[10px] text-slate-400">Click to view details</div>
           )}
         </div>
       )}
@@ -384,11 +384,11 @@ export default function RadarChart({
         <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 text-[10px]">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-0.5 bg-primary rounded" />
-            <span className="text-gray-500">Current</span>
+            <span className="text-slate-500">Current</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-0.5 bg-indigo-500 rounded border-dashed" style={{ borderTop: "2px dashed #6366f1", height: 0 }} />
-            <span className="text-gray-500">{comparisonLabel || "Previous"}</span>
+            <span className="text-slate-500">{comparisonLabel || "Previous"}</span>
           </div>
         </div>
       )}
@@ -397,7 +397,7 @@ export default function RadarChart({
           {multiComparisonSeries.map((series) => (
             <div key={series.label} className="flex items-center gap-1.5">
               <span className="w-3 h-0.5 rounded" style={{ backgroundColor: series.color }} />
-              <span className="text-gray-500">{series.label}</span>
+              <span className="text-slate-500">{series.label}</span>
             </div>
           ))}
         </div>

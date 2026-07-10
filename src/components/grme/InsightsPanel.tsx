@@ -204,20 +204,20 @@ export default function InsightsPanel({
   if (insights.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-      <h3 className="text-sm font-bold text-gray-900 mb-3">Key Insights</h3>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="mb-3 text-sm font-bold text-slate-900">Key Insights</h3>
       <div className="space-y-2.5">
         {insights.map((insight, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-gray-50"
+            className="flex items-center gap-3 rounded-xl p-2.5 transition-all hover:bg-slate-50"
           >
             <span className="text-lg flex-shrink-0">{insight.icon}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+              <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 {insight.label}
               </div>
-              <div className="text-sm font-semibold text-gray-800 truncate">
+              <div className="truncate text-sm font-semibold text-slate-800">
                 {insight.value}
               </div>
             </div>

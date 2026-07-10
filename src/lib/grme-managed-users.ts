@@ -97,12 +97,12 @@ function loadUsers(): ManagedUser[] {
   }
 }
 
-function saveUsers(users: ManagedUser[]): void {
+async function saveUsers(users: ManagedUser[]): Promise<void> {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
     // Sync to API (fire-and-forget)
-    api.saveUsers(users).catch(() => {});
+    await api.saveUsers(users);
   } catch (e) {
     console.error("Failed to save managed users:", e);
   }
@@ -264,7 +264,7 @@ export function useManagedUsers() {
       };
 
       const updated = [...existing, newUser];
-      saveUsers(updated);
+      await saveUsers(updated);
       setUsers(updated);
       return { success: true };
     },
@@ -280,7 +280,7 @@ export function useManagedUsers() {
       const updated = existing.map((u) =>
         u.id === id ? { ...u, ...updates } : u
       );
-      saveUsers(updated);
+      void saveUsers(updated);
       setUsers(updated);
     },
     []
@@ -296,7 +296,7 @@ export function useManagedUsers() {
       const updated = existing.map((u) =>
         u.id === id ? { ...u, passwordHash } : u
       );
-      saveUsers(updated);
+      void saveUsers(updated);
       setUsers(updated);
       return { success: true };
     },
@@ -308,7 +308,7 @@ export function useManagedUsers() {
     const updated = existing.map((u) =>
       u.id === id ? { ...u, active: false } : u
     );
-    saveUsers(updated);
+    void saveUsers(updated);
     setUsers(updated);
   }, []);
 
@@ -317,7 +317,7 @@ export function useManagedUsers() {
     const updated = existing.map((u) =>
       u.id === id ? { ...u, active: true } : u
     );
-    saveUsers(updated);
+    void saveUsers(updated);
     setUsers(updated);
   }, []);
 
@@ -326,7 +326,7 @@ export function useManagedUsers() {
     const updated = existing.map((u) =>
       u.id === id ? { ...u, lastLoginAt: new Date().toISOString() } : u
     );
-    saveUsers(updated);
+    void saveUsers(updated);
     setUsers(updated);
   }, []);
 

@@ -42,8 +42,8 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 shadow-lg">
-      <p className="mb-1.5 text-xs font-semibold text-gray-500">{label}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_20px_40px_rgba(15,23,42,0.12)] backdrop-blur">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
       <div className="space-y-1">
         {payload.map((entry) => (
           <div key={entry.dataKey} className="flex items-center justify-between gap-4">
@@ -52,9 +52,9 @@ function ChartTooltip({
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-xs text-gray-600">{entry.name}</span>
+              <span className="text-xs text-slate-600">{entry.name}</span>
             </div>
-            <span className="text-xs font-bold text-gray-900">
+            <span className="text-xs font-bold text-slate-900">
               {Math.round(entry.value)}
             </span>
           </div>
@@ -152,7 +152,7 @@ function OverviewTab({
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+        <div className="flex h-64 items-center justify-center text-sm text-slate-400">
           Add at least 2 years to see trends
         </div>
       )}
@@ -219,16 +219,16 @@ function DomainsTab({
       {sortedYears.length >= 2 ? (
         <ResponsiveContainer width="100%" height={340}>
           <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.8} />
             <XAxis
               dataKey="year"
-              tick={{ fontSize: 12, fill: "#6b7280" }}
-              axisLine={{ stroke: "#e5e7eb" }}
+              tick={{ fontSize: 12, fill: "#64748b" }}
+              axisLine={{ stroke: "#cbd5e1" }}
               tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 11, fill: "#9ca3af" }}
+              tick={{ fontSize: 11, fill: "#94a3b8" }}
               axisLine={false}
               tickLine={false}
             />
@@ -249,7 +249,7 @@ function DomainsTab({
           </LineChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+        <div className="flex h-64 items-center justify-center text-sm text-slate-400">
           Add at least 2 years to see trends
         </div>
       )}
@@ -269,11 +269,11 @@ function DomainsTab({
           }));
 
           return (
-            <div key={id} className="rounded-lg border border-gray-100 bg-white p-3 hover:shadow-md transition-shadow">
+            <div key={id} className="rounded-2xl border border-slate-100 bg-white p-3 transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-xs font-medium text-gray-700 truncate">
+                  <span className="text-xs font-medium text-slate-700 truncate">
                     {domainLabels[id]}
                   </span>
                 </div>
@@ -346,30 +346,30 @@ function HeatmapTab({
 
   if (sortedYears.length < 2) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
-        Add at least 2 years to see heatmap
-      </div>
+        <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+          Add at least 2 years to see heatmap
+        </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-gray-50">
-              <th className="text-left py-3 px-4 font-semibold text-gray-500 uppercase tracking-wider text-[10px]">
+            <tr className="bg-slate-50">
+              <th className="text-left py-3 px-4 font-semibold text-slate-500 uppercase tracking-[0.22em] text-[10px]">
                 Domain
               </th>
               {sortedYears.map((y) => (
                 <th
                   key={y}
-                  className="text-center py-3 px-4 font-semibold text-gray-500 uppercase tracking-wider text-[10px]"
+                  className="text-center py-3 px-4 font-semibold text-slate-500 uppercase tracking-[0.22em] text-[10px]"
                 >
                   {y}
                 </th>
               ))}
-              <th className="text-center py-3 px-4 font-semibold text-gray-500 uppercase tracking-wider text-[10px]">
+              <th className="text-center py-3 px-4 font-semibold text-slate-500 uppercase tracking-[0.22em] text-[10px]">
                 Trend
               </th>
             </tr>
@@ -381,11 +381,11 @@ function HeatmapTab({
               const diff = last - first;
               const color = domainColors[id] || "#6b7280";
               return (
-                <tr key={id} className="border-t border-gray-100 hover:bg-gray-50/50 transition-colors">
+                <tr key={id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                      <span className="font-medium text-gray-700">{domainLabels[id]}</span>
+                      <span className="font-medium text-slate-700">{domainLabels[id]}</span>
                     </div>
                   </td>
                   {sortedYears.map((y) => {
@@ -535,12 +535,15 @@ export default function TrendChart({
   const worst = domainChanges.reduce((a, b) => (a.diff < b.diff ? a : b));
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3 border-b border-gray-100">
+      <div className="border-b border-slate-100 px-5 pb-4 pt-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold text-gray-900">Score Trends</h3>
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-indigo-500">Analytics</div>
+            <h3 className="mt-1 text-base font-bold text-slate-900">Score Trends</h3>
+          </div>
+          <div className="flex gap-1 rounded-xl bg-slate-100 p-0.5">
             {(
               [
                 { key: "overview", label: "Overview" },
@@ -551,11 +554,11 @@ export default function TrendChart({
               <button
                 key={tab.key}
                 onClick={() => setActiveView(tab.key)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  activeView === tab.key
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    activeView === tab.key
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -567,7 +570,7 @@ export default function TrendChart({
         {sortedYears.length >= 2 && (
           <div className="flex flex-wrap gap-2 text-xs">
             <span
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${
                 overallDiff > 0
                   ? "bg-green-50 text-green-700"
                   : overallDiff < 0

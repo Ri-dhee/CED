@@ -13,6 +13,7 @@ import { useGrmeUser, canEditFramework, canAccessDzongkhag, canAccessThromde, ge
 import {
   exportYearCsv,
   exportAllYearsCsv,
+  exportSheetValuesCsv,
   exportSummaryCsv,
 } from "@/lib/grme-export";
 import RadarChart from "@/components/grme/RadarChart";
@@ -292,6 +293,44 @@ function GRMEApp({
     ? `Thromde: ${availableThromdes.find((t) => t.id === selectedThromdeId)?.name || selectedThromdeId}`
     : "Dzongkhag scope";
 
+  const dashboardOverallChange = previousYear ? Math.round(overallScore - getScoreForYear(previousYear)) : null;
+  const dashboardTopDomains = useMemo(
+    () =>
+      [...framework.domains]
+        .map((domain) => ({
+          domain,
+          score: getDomainScore(domain.id),
+        }))
+        .sort((a, b) => b.score - a.score),
+    [framework.domains, getDomainScore]
+  );
+  const dashboardStrongestDomain = dashboardTopDomains[0] || null;
+  const dashboardWeakestDomain = dashboardTopDomains.length > 0
+    ? [...dashboardTopDomains].sort((a, b) => a.score - b.score)[0]
+    : null;
+  const dashboardOverallScores = useMemo(
+    () => Object.fromEntries(availableYears.map((year) => [year, getScoreForYear(year)])),
+    [availableYears, getScoreForYear]
+  );
+  const dashboardDomainScoresByYear = useMemo(
+    () =>
+      Object.fromEntries(
+        availableYears.map((year) => [
+          year,
+          Object.fromEntries(framework.domains.map((domain) => [domain.id, getDomainScoreForYear(domain.id, year)])),
+        ])
+      ),
+    [availableYears, framework.domains, getDomainScoreForYear]
+  );
+  const dashboardDomainLabels = useMemo(
+    () => Object.fromEntries(framework.domains.map((domain) => [domain.id, domain.name])),
+    [framework.domains]
+  );
+  const dashboardDomainColors = useMemo(
+    () => Object.fromEntries(framework.domains.map((domain) => [domain.id, domain.color])),
+    [framework.domains]
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center">
@@ -377,6 +416,9 @@ function GRMEApp({
                 }
                 onExportAll={() =>
                   exportAllYearsCsv(framework.domains, cityData, availableYears)
+                }
+                onExportSheet={() =>
+                  exportSheetValuesCsv(framework.domains, cityData, availableYears)
                 }
                 onExportSummary={() =>
                   exportSummaryCsv(framework.domains, cityData, availableYears)
@@ -575,6 +617,30 @@ function GRMEApp({
               />
             ) : (
               <>
+            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Overall score</div>
+                <div className="mt-2 text-2xl font-bold" style={{ color: overallColor }}>{Math.round(overallScore)}</div>
+                <div className="mt-1 text-xs text-gray-500">{overallStatus} performance</div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Data confidence</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">{stats.confidence}%</div>
+                <div className="mt-1 text-xs text-gray-500">Based on {stats.filled}/{stats.total} indicators</div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Top domain</div>
+                <div className="mt-2 text-lg font-bold text-slate-900 truncate">{dashboardStrongestDomain?.domain.shortName || "None"}</div>
+                <div className="mt-1 text-xs text-gray-500">{dashboardStrongestDomain ? `${Math.round(dashboardStrongestDomain.score)} points` : "No score yet"}</div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">Year over year</div>
+                <div className={`mt-2 text-2xl font-bold ${dashboardOverallChange === null ? "text-slate-400" : dashboardOverallChange > 0 ? "text-emerald-600" : dashboardOverallChange < 0 ? "text-rose-500" : "text-slate-500"}`}>
+                  {dashboardOverallChange === null ? "—" : `${dashboardOverallChange > 0 ? "+" : ""}${dashboardOverallChange}`}
+                </div>
+                <div className="mt-1 text-xs text-gray-500">{previousYear ? `${previousYear} to ${selectedYear}` : "Add another year to compare"}</div>
+              </div>
+            </div>
             
             {/* ═══ HERO ROW: Animated Score + Radar + Data Quality ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -738,6 +804,35 @@ function GRMEApp({
               />
             </div>
 
+            {availableYears.length >= 2 && (
+              <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Trend Explorer</h2>
+                    <p className="text-xs text-gray-500">Switch between overall trend, domain lines, and heatmap.</p>
+                  </div>
+                  {dashboardWeakestDomain && (
+                    <div className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-medium text-rose-600">
+                      Watch: {dashboardWeakestDomain.domain.shortName}
+                    </div>
+                  )}
+                </div>
+                {lowConfidenceYears.length > 0 && (
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Trend charts include preliminary years: {lowConfidenceYears.join(", ")}.
+                  </div>
+                )}
+                <TrendChart
+                  years={availableYears}
+                  overallScores={dashboardOverallScores}
+                  domainScores={dashboardDomainScoresByYear}
+                  domainLabels={dashboardDomainLabels}
+                  domainColors={dashboardDomainColors}
+                  comparabilityWarning={comparabilityWarning}
+                />
+              </div>
+            )}
+
             {/* ═══ DOMAIN CARDS ═══ */}
             <div className="mt-6">
               <div className="flex items-center justify-between mb-4">
@@ -810,40 +905,6 @@ function GRMEApp({
               </div>
             )}
 
-            {/* ═══ TREND CHARTS (2+ years) ═══ */}
-            {availableYears.length >= 2 && (
-              <div className="mt-6">
-                {lowConfidenceYears.length > 0 && (
-                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    Trend charts include preliminary years: {lowConfidenceYears.join(", ")}.
-                  </div>
-                )}
-                <TrendChart
-                  years={availableYears}
-                  overallScores={Object.fromEntries(
-                    availableYears.map((y) => [y, getScoreForYear(y)])
-                  )}
-                  domainScores={Object.fromEntries(
-                    availableYears.map((y) => [
-                      y,
-                      Object.fromEntries(
-                        framework.domains.map((d) => [
-                          d.id,
-                          getDomainScoreForYear(d.id, y),
-                        ])
-                      ),
-                    ])
-                  )}
-                  domainLabels={Object.fromEntries(
-                    framework.domains.map((d) => [d.id, d.name])
-                  )}
-                  domainColors={Object.fromEntries(
-                    framework.domains.map((d) => [d.id, d.color])
-                  )}
-                  comparabilityWarning={comparabilityWarning}
-                />
-              </div>
-            )}
               </>
             )}
           </div>
@@ -1232,6 +1293,10 @@ function PublicDashboard({
         <div className="relative overflow-hidden lg:col-span-4 rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-center text-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
           <div className="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-cyan-400/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-fuchsia-500/15 blur-3xl" />
+          <div className="absolute inset-x-6 top-6 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
+            <span>Live overview</span>
+            <span>{selectedYear}</span>
+          </div>
           <AnimatedScore
             score={overallScore}
             previousScore={previousOverall}
@@ -1353,10 +1418,10 @@ function PublicDashboard({
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Summary</div>
-            <div className="mt-2 text-sm text-slate-700">{statusCopy}.</div>
-          </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Summary</div>
+              <div className="mt-2 text-sm text-slate-700">{statusCopy}.</div>
+            </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Improvement</div>
             <div className="mt-2 text-sm text-slate-700">{overallChange !== null && overallChange > 0 ? `The score is up by ${overallChange} points since ${previousYear}.` : "Add another year to see whether performance is improving."}</div>
@@ -1487,36 +1552,49 @@ function PublicDashboard({
 function ExportButton({
   onExportCurrent,
   onExportAll,
+  onExportSheet,
   onExportSummary,
 }: {
   onExportCurrent: () => void;
   onExportAll: () => void;
+  onExportSheet: () => void;
   onExportSummary: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-haspopup="true"
-        aria-label="Export data"
-        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-        Export
-        <svg
-          className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <button
+          onClick={() => {
+            onExportSheet();
+            setOpen(false);
+          }}
+          aria-label="Export sheet values"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export Sheet Values
+        </button>
+        <button
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-haspopup="true"
+          aria-label="Export options"
+          className="border-l border-gray-200 px-2 text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          <svg
+            className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
 
       {open && (
         <>
@@ -1556,6 +1634,21 @@ function ExportButton({
                 <div>
                   <div className="font-medium">All Years</div>
                   <div className="text-[10px] text-gray-400">Comparison across years</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  onExportSheet();
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                <div>
+                  <div className="font-medium">Sheet Values</div>
+                  <div className="text-[10px] text-gray-400">One row per indicator with year columns</div>
                 </div>
               </button>
               <button
