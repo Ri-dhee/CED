@@ -350,15 +350,15 @@ function GRMEApp({
       <section className="pt-28 sm:pt-36 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium mb-6 border border-primary/10">
+            <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/80 text-primary rounded-full text-sm font-medium mb-6 border border-primary/10 shadow-sm backdrop-blur">
               <Image
                 src={logoCed}
                 alt="CED logo"
-                width={18}
-                height={18}
-                className="h-[18px] w-[18px] rounded-sm object-contain"
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-sm object-contain"
               />
-              Dynamic Assessment Dashboard
+              <span className="text-slate-900">Dynamic Assessment Dashboard</span>
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
               GRME <span className="gradient-text">Index</span>

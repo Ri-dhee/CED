@@ -97,15 +97,15 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium mb-4 border border-primary/10">
+          <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/85 text-primary rounded-full text-sm font-medium mb-4 border border-primary/10 shadow-sm backdrop-blur">
             <Image
               src={logoCed}
               alt="CED logo"
-              width={20}
-              height={20}
-              className="h-5 w-5 rounded-sm object-contain"
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-sm object-contain"
             />
-            GRME Index
+            <span className="text-slate-900">GRME Index</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome
