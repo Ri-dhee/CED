@@ -88,8 +88,11 @@ function getIndicatorDomainId(domains: Domain[] | undefined, indicatorId: string
   return null;
 }
 
-function getThromdeDzongkhagId(thromdeId: string): string | null {
-  return THROMDES.find((thromde) => thromde.id === thromdeId)?.dzongkhagId || null;
+function getThromdeDzongkhagId(
+  thromdeId: string,
+  availableThromdes: { id: string; dzongkhagId: string; name: string }[] = THROMDES
+): string | null {
+  return availableThromdes.find((thromde) => thromde.id === thromdeId)?.dzongkhagId || null;
 }
 
 export function canEnterDataDuringWindow(
@@ -108,11 +111,15 @@ export function canEnterDataDuringWindow(
   return current >= start && current <= end;
 }
 
-export function canAccessThromde(user: GrmeUser, thromdeId: string): boolean {
+export function canAccessThromde(
+  user: GrmeUser,
+  thromdeId: string,
+  availableThromdes: { id: string; dzongkhagId: string; name: string }[] = THROMDES
+): boolean {
   if (user.role === "admin") return true;
   if (!thromdeId) return false;
 
-  const dzongkhagId = getThromdeDzongkhagId(thromdeId);
+  const dzongkhagId = getThromdeDzongkhagId(thromdeId, availableThromdes);
   if (dzongkhagId && user.allowedDzongkhagIds?.includes(dzongkhagId)) return true;
 
   const allowedThromdeIds = user.allowedThromdeIds || [];
@@ -123,29 +130,37 @@ export function canAccessThromde(user: GrmeUser, thromdeId: string): boolean {
 }
 
 /** Returns the list of dzongkhags a user is allowed to see. */
-export function getAccessibleDzongkhags(user: GrmeUser): typeof CITIES {
-  if (user.role === "admin") return CITIES;
+export function getAccessibleDzongkhags(
+  user: GrmeUser,
+  availableDzongkhags: { id: string; name: string }[] = CITIES,
+  availableThromdes: { id: string; dzongkhagId: string; name: string }[] = THROMDES
+): { id: string; name: string }[] {
+  if (user.role === "admin") return availableDzongkhags;
   const visibleIds = new Set<string>();
 
   if (user.scope.dzongkhagId) visibleIds.add(user.scope.dzongkhagId);
   for (const id of user.allowedDzongkhagIds || []) visibleIds.add(id);
   for (const thromdeId of user.allowedThromdeIds || []) {
-    const dzongkhagId = getThromdeDzongkhagId(thromdeId);
+    const dzongkhagId = getThromdeDzongkhagId(thromdeId, availableThromdes);
     if (dzongkhagId) visibleIds.add(dzongkhagId);
   }
   if (user.scope.thromdeId) {
-    const dzongkhagId = getThromdeDzongkhagId(user.scope.thromdeId);
+    const dzongkhagId = getThromdeDzongkhagId(user.scope.thromdeId, availableThromdes);
     if (dzongkhagId) visibleIds.add(dzongkhagId);
   }
 
-  return CITIES.filter((city) => visibleIds.has(city.id));
+  return availableDzongkhags.filter((city) => visibleIds.has(city.id));
 }
 
 /** True if the user can edit data in the given dzongkhag. */
-export function canAccessDzongkhag(user: GrmeUser, dzongkhagId: string): boolean {
+export function canAccessDzongkhag(
+  user: GrmeUser,
+  dzongkhagId: string,
+  availableThromdes: { id: string; dzongkhagId: string; name: string }[] = THROMDES
+): boolean {
   if (user.role === "admin") return true;
   if (user.allowedDzongkhagIds?.includes(dzongkhagId)) return true;
-  if (user.allowedThromdeIds?.some((thromdeId) => getThromdeDzongkhagId(thromdeId) === dzongkhagId)) return true;
+  if (user.allowedThromdeIds?.some((thromdeId) => getThromdeDzongkhagId(thromdeId, availableThromdes) === dzongkhagId)) return true;
   return user.scope.dzongkhagId === dzongkhagId;
 }
 

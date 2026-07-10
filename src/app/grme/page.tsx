@@ -86,6 +86,7 @@ function GRMEApp({
     setSelectedCity,
     selectedThromdeId,
     setSelectedThromdeId,
+    dzongkhags,
     availableThromdes,
     availableYears,
     createYear,
@@ -283,8 +284,8 @@ function GRMEApp({
 
   const isAdmin = canEditFramework(user.role);
   const dataEntryOpen = canEnterDataDuringWindow(user, dataEntryWindow);
-  const canEdit = dataEntryOpen && (selectedThromdeId ? canAccessThromde(user, selectedThromdeId) : canAccessDzongkhag(user, selectedCity));
-  const accessibleDzongkhags = getAccessibleDzongkhags(user);
+  const canEdit = dataEntryOpen && (selectedThromdeId ? canAccessThromde(user, selectedThromdeId, availableThromdes) : canAccessDzongkhag(user, selectedCity, availableThromdes));
+  const accessibleDzongkhags = getAccessibleDzongkhags(user, dzongkhags, availableThromdes);
   const currentScopeLabel = selectedThromdeId
     ? `Thromde: ${availableThromdes.find((t) => t.id === selectedThromdeId)?.name || selectedThromdeId}`
     : "Dzongkhag scope";

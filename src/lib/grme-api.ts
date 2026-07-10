@@ -86,6 +86,10 @@ function normalizeStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function isNamedLocation(value: unknown): value is { id: string; name: string } {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value) && typeof (value as { id?: unknown }).id === "string" && typeof (value as { name?: unknown }).name === "string";
+}
+
 async function loadConfigValue(key: string): Promise<string | null> {
   const { data, error } = await supabase()
     .from("config")
@@ -108,6 +112,14 @@ async function saveConfigValue(key: string, value: string): Promise<void> {
   });
 }
 
+function normalizeNamedLocations(value: unknown): Array<{ id: string; name: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isNamedLocation).map((location) => ({
+    id: location.id.trim(),
+    name: location.name.trim(),
+  })).filter((location) => location.id && location.name);
+}
+
 export async function loadDataEntryWindowConfig(): Promise<DataEntryWindowConfig | null> {
   const raw = await loadConfigValue("data_entry_window");
   if (!raw) return null;
@@ -126,6 +138,25 @@ export async function loadDataEntryWindowConfig(): Promise<DataEntryWindowConfig
 
 export async function saveDataEntryWindowConfig(window: DataEntryWindowConfig): Promise<void> {
   await saveConfigValue("data_entry_window", JSON.stringify(window));
+}
+
+export async function loadDzongkhagsConfig(): Promise<Array<{ id: string; name: string }>> {
+  const raw = await loadConfigValue("dzongkhags");
+  if (!raw) return CITIES.map((city) => ({ id: city.id, name: city.name }));
+
+  try {
+    const parsed = normalizeNamedLocations(JSON.parse(raw));
+    return parsed.length > 0 ? parsed : CITIES.map((city) => ({ id: city.id, name: city.name }));
+  } catch {
+    return CITIES.map((city) => ({ id: city.id, name: city.name }));
+  }
+}
+
+export async function saveDzongkhagsConfig(dzongkhags: Array<{ id: string; name: string }>): Promise<void> {
+  const payload = dzongkhags
+    .map((dzongkhag) => ({ id: dzongkhag.id.trim(), name: dzongkhag.name.trim() }))
+    .filter((dzongkhag) => dzongkhag.id && dzongkhag.name);
+  await saveConfigValue("dzongkhags", JSON.stringify(payload));
 }
 
 export async function recordAdminEvent(params: {

@@ -574,6 +574,7 @@ export function useGRMEData(
   const lastAutoRefreshAtRef = useRef<number>(0);
 
   const [allData, setAllData] = useState<Record<string, CityData>>({});
+  const [dzongkhags, setDzongkhags] = useState<{ id: string; name: string }[]>(CITIES);
   const [selectedCity, setSelectedCity] = useState<string>("thimphu");
   const [selectedThromdeId, setSelectedThromdeId] = useState<string>("");
   const [thromdes, setThromdes] = useState<Thromde[]>([]);
@@ -586,9 +587,9 @@ export function useGRMEData(
   const currentUser = userName || "Stakeholder";
   const currentYear = selectedYear || new Date().getFullYear();
   const accessibleCityIds = useMemo(() => {
-    if (!user || user.role === "admin") return new Set(CITIES.map((c) => c.id));
-    return new Set(getAccessibleDzongkhags(user).map((c) => c.id));
-  }, [user]);
+    if (!user || user.role === "admin") return new Set(dzongkhags.map((c) => c.id));
+    return new Set(getAccessibleDzongkhags(user, dzongkhags, thromdes).map((c) => c.id));
+  }, [dzongkhags, thromdes, user]);
   const activeCityId = useMemo(() => {
     if (accessibleCityIds.size === 0) return selectedCity;
     return accessibleCityIds.has(selectedCity) ? selectedCity : [...accessibleCityIds][0] || selectedCity;
@@ -635,6 +636,7 @@ export function useGRMEData(
       const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
       saveAllData(localData);
       setAllData(localData);
+      setDzongkhags(CITIES);
       setThromdes([]);
       setApiAvailable(false);
       setSyncError(null);
@@ -644,6 +646,7 @@ export function useGRMEData(
     }
     try {
       const apiData = await api.loadAssessments(activeCityId);
+      const apiDzongkhags = await api.loadDzongkhagsConfig().catch(() => CITIES.map((city) => ({ id: city.id, name: city.name })));
       const apiThromdes = await api.loadThromdes().catch(() => []);
       const windowConfig = await api.loadDataEntryWindowConfig().catch(() => null);
       const reconciled = reconcileDataWithDomains(apiData, domainsRef.current);
@@ -662,6 +665,7 @@ export function useGRMEData(
       merged = applyPendingMutationsToData(merged);
 
       setAllData(merged);
+      setDzongkhags(apiDzongkhags);
       setThromdes(apiThromdes);
       setDataEntryWindow(windowConfig);
       saveAllData(merged);
@@ -710,6 +714,7 @@ export function useGRMEData(
           const localData = backfillScoringMetadata(loadAllData(), domainsRef.current);
           saveAllData(localData);
           setAllData(localData);
+          setDzongkhags(CITIES);
           setThromdes([]);
           setApiAvailable(false);
           setAdminEvents([]);
@@ -721,6 +726,7 @@ export function useGRMEData(
       }
       try {
         const apiData = await api.loadAssessments(activeCityId);
+        const apiDzongkhags = await api.loadDzongkhagsConfig().catch(() => CITIES.map((city) => ({ id: city.id, name: city.name })));
         const apiThromdes = await api.loadThromdes().catch(() => []);
         const windowConfig = await api.loadDataEntryWindowConfig().catch(() => null);
         if (!cancelled) {
@@ -738,6 +744,7 @@ export function useGRMEData(
           merged = applyPendingMutationsToData(merged);
 
           setAllData(merged);
+          setDzongkhags(apiDzongkhags);
           setThromdes(apiThromdes);
           setDataEntryWindow(windowConfig);
           saveAllData(merged);
@@ -752,6 +759,7 @@ export function useGRMEData(
           const withPending = applyPendingMutationsToData(localData);
           saveAllData(withPending);
           setAllData(withPending);
+          setDzongkhags(CITIES);
           setThromdes([]);
           setApiAvailable(false);
           setAdminEvents([]);
@@ -885,7 +893,7 @@ export function useGRMEData(
 
   const createYear = useCallback(
     async (year: number, copyFrom?: number) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id, thromdes) : canAccessDzongkhag(user, activeCityId, thromdes)))) return;
       let indicators: Record<string, IndicatorData> = {};
       let auditLog: AuditLog[] = [];
 
@@ -963,7 +971,7 @@ export function useGRMEData(
 
   const deleteYear = useCallback(
     async (year: number) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id, thromdes) : canAccessDzongkhag(user, activeCityId, thromdes)))) return;
       const city = ensureCity(activeCityId);
       const newAssessments = { ...city.assessments };
       const nextThromdeAssessments = { ...(city.thromdeAssessments || {}) };
@@ -1009,7 +1017,7 @@ export function useGRMEData(
 
   const updateIndicator = useCallback(
     async (indicatorId: string, value: number | string | boolean, notes?: string) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id, thromdes) : canAccessDzongkhag(user, activeCityId, thromdes)))) return;
       const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
       if (user && indicator && !canAccessIndicator(user, indicator, domainsRef.current)) return;
       const city = ensureCity(activeCityId);
@@ -1130,7 +1138,7 @@ export function useGRMEData(
 
   const addAuditNote = useCallback(
     async (indicatorId: string, note: string) => {
-      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id) : canAccessDzongkhag(user, activeCityId)))) return;
+      if (user && (!canEnterDataDuringWindow(user, dataEntryWindow) || !(selectedThromde ? canAccessThromde(user, selectedThromde.id, thromdes) : canAccessDzongkhag(user, activeCityId, thromdes)))) return;
       const indicator = findIndicatorInDomains(domainsRef.current, indicatorId);
       if (user && indicator && !canAccessIndicator(user, indicator, domainsRef.current)) return;
       const city = ensureCity(activeCityId);
@@ -1451,6 +1459,7 @@ export function useGRMEData(
     setSelectedCity,
     selectedThromdeId: validSelectedThromdeId,
     setSelectedThromdeId,
+    dzongkhags,
     availableThromdes,
     selectedThromde,
     selectedYear: currentYear,

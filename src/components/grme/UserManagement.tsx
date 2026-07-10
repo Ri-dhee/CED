@@ -9,9 +9,9 @@ import {
   ROLE_LABELS,
   ROLE_COLORS,
 } from "@/lib/grme-user";
-import { CITIES, Domain, THROMDES, STAKEHOLDERS } from "@/lib/grme-data";
+import { CITIES, Domain, STAKEHOLDERS, Thromde } from "@/lib/grme-data";
 import { DataEntryWindowConfig } from "@/lib/grme-user";
-import { saveDataEntryWindowConfig, recordAdminEvent } from "@/lib/grme-api";
+import { loadDzongkhagsConfig, loadThromdes, recordAdminEvent, saveDataEntryWindowConfig, saveDzongkhagsConfig, saveThromde } from "@/lib/grme-api";
 import type { AuditLog } from "@/lib/grme-data";
 
 interface UserManagementProps {
@@ -31,6 +31,25 @@ function toLocalInputValue(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return "";
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function ensureUniqueId(baseId: string, existingIds: string[]): string {
+  if (!existingIds.includes(baseId)) return baseId;
+  let counter = 2;
+  let next = `${baseId}-${counter}`;
+  while (existingIds.includes(next)) {
+    counter += 1;
+    next = `${baseId}-${counter}`;
+  }
+  return next;
 }
 
 export default function UserManagement({ onClose, dataEntryWindow, adminEvents, adminName, onRefreshData, domains }: UserManagementProps) {
@@ -66,6 +85,13 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
   const [windowEnd, setWindowEnd] = useState("");
   const [windowSaving, setWindowSaving] = useState(false);
   const [windowError, setWindowError] = useState("");
+  const [dzongkhags, setDzongkhags] = useState<{ id: string; name: string }[]>(CITIES);
+  const [thromdes, setThromdes] = useState<Thromde[]>([]);
+  const [newDzongkhagName, setNewDzongkhagName] = useState("");
+  const [newThromdeName, setNewThromdeName] = useState("");
+  const [newThromdeDzongkhag, setNewThromdeDzongkhag] = useState("");
+  const [locationSaving, setLocationSaving] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [newAllowedDomainIds, setNewAllowedDomainIds] = useState<string[]>([]);
   const [newAllowedIndicatorIds, setNewAllowedIndicatorIds] = useState<string[]>([]);
   const [newAllowedDzongkhagIds, setNewAllowedDzongkhagIds] = useState<string[]>([]);
@@ -82,11 +108,111 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
     setNewAllowedThromdeIds([]);
   };
 
+  const handleAddDzongkhag = async () => {
+    const name = newDzongkhagName.trim();
+    if (!name) {
+      setLocationError("Dzongkhag name is required.");
+      return;
+    }
+
+    const nextId = ensureUniqueId(slugify(name), dzongkhags.map((item) => item.id));
+    const nextDzongkhags = [...dzongkhags, { id: nextId, name }];
+
+    setLocationSaving(true);
+    setLocationError("");
+    try {
+      await saveDzongkhagsConfig(nextDzongkhags);
+      try {
+        await recordAdminEvent({
+          actor: adminName,
+          action: "create",
+          entity: "dzongkhag",
+          notes: JSON.stringify({ id: nextId, name }),
+        });
+      } catch (error) {
+        console.warn("Saved dzongkhag, but could not record the admin event.", error);
+      }
+      setDzongkhags(nextDzongkhags);
+      setNewDzongkhag(nextId);
+      setNewThromdeDzongkhag(nextId);
+      setNewDzongkhagName("");
+      await Promise.resolve(onRefreshData());
+    } catch {
+      setLocationError("Unable to save dzongkhag.");
+    } finally {
+      setLocationSaving(false);
+    }
+  };
+
+  const handleAddThromde = async () => {
+    const name = newThromdeName.trim();
+    if (!name) {
+      setLocationError("Thromde name is required.");
+      return;
+    }
+    if (!newThromdeDzongkhag) {
+      setLocationError("Select a dzongkhag first.");
+      return;
+    }
+
+    const baseId = `${newThromdeDzongkhag}-${slugify(name)}`;
+    const nextId = ensureUniqueId(baseId, thromdes.map((item) => item.id));
+    const nextThromde = { id: nextId, dzongkhagId: newThromdeDzongkhag, name };
+
+    setLocationSaving(true);
+    setLocationError("");
+    try {
+      await saveThromde(nextThromde);
+      try {
+        await recordAdminEvent({
+          actor: adminName,
+          action: "create",
+          entity: "thromde",
+          notes: JSON.stringify(nextThromde),
+        });
+      } catch (error) {
+        console.warn("Saved thromde, but could not record the admin event.", error);
+      }
+      const nextThromdes = [...thromdes, nextThromde];
+      setThromdes(nextThromdes);
+      setNewThromdeName("");
+      await Promise.resolve(onRefreshData());
+    } catch {
+      setLocationError("Unable to save thromde.");
+    } finally {
+      setLocationSaving(false);
+    }
+  };
+
   useEffect(() => {
     setWindowEnabled(Boolean(dataEntryWindow?.enabled));
     setWindowStart(toLocalInputValue(dataEntryWindow?.startAt));
     setWindowEnd(toLocalInputValue(dataEntryWindow?.endAt));
   }, [dataEntryWindow]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLocations() {
+      const [loadedDzongkhags, loadedThromdes] = await Promise.all([
+        loadDzongkhagsConfig().catch(() => CITIES.map((city) => ({ id: city.id, name: city.name }))),
+        loadThromdes().catch(() => []),
+      ]);
+
+      if (cancelled) return;
+      setDzongkhags(loadedDzongkhags.length > 0 ? loadedDzongkhags : CITIES.map((city) => ({ id: city.id, name: city.name })));
+      setThromdes(loadedThromdes);
+      setNewDzongkhag(loadedDzongkhags[0]?.id || CITIES[0]?.id || "");
+      setEditDzongkhag((current) => loadedDzongkhags.some((item) => item.id === current) ? current : (loadedDzongkhags[0]?.id || CITIES[0]?.id || ""));
+      setNewThromdeDzongkhag(loadedDzongkhags[0]?.id || CITIES[0]?.id || "");
+      setNewDzongkhagName("");
+    }
+
+    loadLocations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleAdd = async () => {
     if (!newName.trim()) {
@@ -284,15 +410,15 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                 </div>
                 <div>
                   <label htmlFor="grme-user-new-dzongkhag" className="block text-xs font-medium text-gray-500 mb-1">Dzongkhag</label>
-                  <select id="grme-user-new-dzongkhag" name="dzongkhag" value={newDzongkhag} onChange={(e) => setNewDzongkhag(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                    {CITIES.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <select id="grme-user-new-dzongkhag" name="dzongkhag" value={newDzongkhag} onChange={(e) => { setNewDzongkhag(e.target.value); setNewThromde(""); }} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    {dzongkhags.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label htmlFor="grme-user-new-thromde" className="block text-xs font-medium text-gray-500 mb-1">Thromde</label>
                   <select id="grme-user-new-thromde" name="thromde" value={newThromde} onChange={(e) => setNewThromde(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                     <option value="">None</option>
-                    {THROMDES.filter((t) => t.dzongkhagId === newDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {thromdes.filter((t) => t.dzongkhagId === newDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -324,6 +450,69 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                   />
                 </div>
               </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Location Library</h4>
+                    <p className="text-[11px] text-slate-400">Admins control the selectable dzongkhags and thromdes.</p>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    {dzongkhags.length} dzongkhags · {thromdes.length} thromdes
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newDzongkhagName}
+                      onChange={(e) => { setNewDzongkhagName(e.target.value); setLocationError(""); }}
+                      placeholder="New dzongkhag name"
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                    />
+                    <button
+                      onClick={handleAddDzongkhag}
+                      disabled={locationSaving}
+                      className="px-3 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newThromdeName}
+                      onChange={(e) => { setNewThromdeName(e.target.value); setLocationError(""); }}
+                      placeholder="New thromde name"
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                    />
+                    <select
+                      value={newThromdeDzongkhag}
+                      onChange={(e) => setNewThromdeDzongkhag(e.target.value)}
+                      className="w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                    >
+                      {dzongkhags.map((dzongkhag) => (
+                        <option key={dzongkhag.id} value={dzongkhag.id}>{dzongkhag.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleAddThromde}
+                      disabled={locationSaving}
+                      className="px-3 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+                {locationError && <p className="text-xs text-red-500">{locationError}</p>}
+                <div className="max-h-24 overflow-y-auto space-y-1 text-[11px] text-slate-500">
+                  {dzongkhags.map((dzongkhag) => (
+                    <div key={dzongkhag.id} className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-200 px-2 py-1.5">
+                      <span className="font-medium text-slate-700">{dzongkhag.name}</span>
+                      <span>{thromdes.filter((thromde) => thromde.dzongkhagId === dzongkhag.id).length} thromdes</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               {newRole !== "admin" ? (
                 <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -340,7 +529,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                     <div>
                       <div className="text-[11px] font-medium text-slate-500 mb-2">Dzongkhags</div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {CITIES.map((city) => (
+                        {dzongkhags.map((city) => (
                           <label key={city.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700">
                             <input
                               type="checkbox"
@@ -356,7 +545,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                     <div>
                       <div className="text-[11px] font-medium text-slate-500 mb-2">Thromdes</div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {THROMDES.map((thromde) => (
+                        {thromdes.map((thromde) => (
                           <label key={thromde.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700">
                             <input
                               type="checkbox"
@@ -364,7 +553,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                               onChange={() => toggleSelection(thromde.id, newAllowedThromdeIds, setNewAllowedThromdeIds)}
                             />
                             <span>{thromde.name}</span>
-                            <span className="text-[10px] text-slate-400 ml-auto">{CITIES.find((c) => c.id === thromde.dzongkhagId)?.name || thromde.dzongkhagId}</span>
+                            <span className="text-[10px] text-slate-400 ml-auto">{dzongkhags.find((c) => c.id === thromde.dzongkhagId)?.name || thromde.dzongkhagId}</span>
                           </label>
                         ))}
                       </div>
@@ -573,12 +762,12 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                           <select value={editStakeholder} onChange={(e) => setEditStakeholder(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
                             {STAKEHOLDERS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
-                          <select value={editDzongkhag} onChange={(e) => setEditDzongkhag(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
-                            {CITIES.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          <select value={editDzongkhag} onChange={(e) => { setEditDzongkhag(e.target.value); setEditThromde(""); }} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
+                            {dzongkhags.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
                           <select value={editThromde} onChange={(e) => setEditThromde(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30">
                             <option value="">None</option>
-                            {THROMDES.filter((t) => t.dzongkhagId === editDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {thromdes.filter((t) => t.dzongkhagId === editDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                           </select>
                           <button
                             onClick={() => handleUpdate(user.id)}

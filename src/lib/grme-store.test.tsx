@@ -73,6 +73,7 @@ const domains: Domain[] = [
 
 const mockApiFns = {
   loadAssessments: vi.fn(),
+  loadDzongkhagsConfig: vi.fn().mockResolvedValue([{ id: "thimphu", name: "Thimphu" }]),
   loadThromdes: vi.fn(),
   saveAssessments: vi.fn(),
   saveAssessment: vi.fn(),
@@ -80,6 +81,8 @@ const mockApiFns = {
   addAuditEntry: vi.fn(),
   loadAuditLogsForAssessment: vi.fn().mockResolvedValue({}),
   loadDataEntryWindowConfig: vi.fn().mockResolvedValue(null),
+  saveDzongkhagsConfig: vi.fn(),
+  saveThromde: vi.fn(),
 };
 
 let supabaseHasConfig = false;
