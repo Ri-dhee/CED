@@ -144,16 +144,20 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
         startAt: windowEnabled ? new Date(windowStart).toISOString() : null,
         endAt: windowEnabled ? new Date(windowEnd).toISOString() : null,
       });
-      await recordAdminEvent({
-        actor: adminName,
-        action: "update",
-        entity: "data-entry-window",
-        notes: JSON.stringify({
-          enabled: windowEnabled,
-          startAt: windowEnabled ? new Date(windowStart).toISOString() : null,
-          endAt: windowEnabled ? new Date(windowEnd).toISOString() : null,
-        }),
-      });
+      try {
+        await recordAdminEvent({
+          actor: adminName,
+          action: "update",
+          entity: "data-entry-window",
+          notes: JSON.stringify({
+            enabled: windowEnabled,
+            startAt: windowEnabled ? new Date(windowStart).toISOString() : null,
+            endAt: windowEnabled ? new Date(windowEnd).toISOString() : null,
+          }),
+        });
+      } catch (error) {
+        console.warn("Saved data entry window, but could not record the admin event.", error);
+      }
       await Promise.resolve(onRefreshData());
     } catch {
       setWindowError("Unable to save data entry window.");
