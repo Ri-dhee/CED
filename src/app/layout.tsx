@@ -182,18 +182,19 @@ export default function RootLayout({
                     className="h-10 w-10 sm:h-12 sm:w-12 object-contain shrink-0"
                   />
                   <div>
-                    <span className="font-bold text-white block leading-tight">Center for Environment</span>
-                    <span className="text-xs text-white/60">& Development</span>
+                    <span className="font-bold text-white block leading-tight">Centre for Environment</span>
+                    <span className="text-xs text-white/60 block">& Development</span>
+                    <span className="text-xs text-white/50 block">Research and Consultancy Services</span>
                   </div>
                 </div>
                 <p className="text-white/70 text-sm leading-relaxed mb-6">
-                  Empowering sustainable futures through expert consultation, innovative solutions, and unwavering commitment to environmental stewardship.
+                  Research and consultancy services in environmental management and sustainable development.
                 </p>
                 <ul className="flex gap-3 list-none p-0 m-0" aria-label="Social media links">
                   {[
-                    { label: "LinkedIn", href: "#" },
-                    { label: "X", href: "#" },
-                    { label: "Facebook", href: "#" },
+                    { label: "Website", href: "https://www.cedbhutan.com" },
+                    { label: "Email", href: "mailto:ced.bhutan@gmail.com" },
+                    { label: "Map", href: "https://www.google.com/search?q=Chhagoedhing%2C+Dolaygang+Road%2C+Simtokha+E4+zone%2C+Thimphu+Thromde%2C+Bhutan" },
                   ].map((social) => (
                     <li key={social.label}>
                       <a
@@ -203,7 +204,7 @@ export default function RootLayout({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {social.label.slice(0, 2)}
+                        {social.label === "Website" ? "W" : social.label === "Email" ? "E" : "M"}
                       </a>
                     </li>
                   ))}
@@ -254,27 +255,27 @@ export default function RootLayout({
                     <svg className="w-4 h-4 mt-0.5 text-primary-light shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
-                    <a href="mailto:contact@ced-consult.com" className="hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light rounded">contact@ced-consult.com</a>
+                    <a href="mailto:ced.bhutan@gmail.com" className="hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light rounded">ced.bhutan@gmail.com</a>
                   </div>
                   <div className="flex items-start gap-3">
                     <svg className="w-4 h-4 mt-0.5 text-primary-light shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
-                    <a href="tel:+975-2-324456" className="hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light rounded">+975-2-324456</a>
+                    <a href="https://www.cedbhutan.com" className="hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-light rounded">www.cedbhutan.com</a>
                   </div>
                   <div className="flex items-start gap-3">
                     <svg className="w-4 h-4 mt-0.5 text-primary-light shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span>123 Green Street, Eco City</span>
+                    <span>Chhagoedhing, Dolaygang Road, Simtokha E4 zone, Thimphu Thromde, Bhutan</span>
                   </div>
                 </div>
               </div>
             </div>
             <div className="border-t border-white/10 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/60">
-              <span>&copy; {new Date().getFullYear()} CED. All rights reserved.</span>
-              <span>Committed to a sustainable future.</span>
+              <span>&copy; {new Date().getFullYear()} Centre for Environment and Development</span>
+              <span>Research and Consultancy Services</span>
             </div>
           </div>
         </footer>
