@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { recordAdminEvent, saveDzongkhagsConfig, saveThromde } from "@/lib/grme-api";
+import { deleteDzongkhag, deleteThromde, recordAdminEvent, saveDzongkhagsConfig, saveThromde } from "@/lib/grme-api";
 import type { Thromde } from "@/lib/grme-data";
 
 interface LocationManagementProps {
@@ -104,6 +104,56 @@ export default function LocationManagement({ dzongkhags, thromdes, adminName, on
     }
   };
 
+  const handleDeleteDzongkhag = async (dzongkhagId: string) => {
+    if (!confirm("Delete this dzongkhag and its thromdes?")) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      await deleteDzongkhag(dzongkhagId);
+      try {
+        await recordAdminEvent({
+          actor: adminName,
+          action: "delete",
+          entity: "dzongkhag",
+          notes: JSON.stringify({ id: dzongkhagId }),
+        });
+      } catch (logError) {
+        console.warn("Deleted dzongkhag, but could not record the admin event.", logError);
+      }
+      await Promise.resolve(onRefreshData());
+    } catch {
+      setError("Unable to delete dzongkhag.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteThromde = async (thromdeId: string) => {
+    if (!confirm("Delete this thromde?")) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      await deleteThromde(thromdeId);
+      try {
+        await recordAdminEvent({
+          actor: adminName,
+          action: "delete",
+          entity: "thromde",
+          notes: JSON.stringify({ id: thromdeId }),
+        });
+      } catch (logError) {
+        console.warn("Deleted thromde, but could not record the admin event.", logError);
+      }
+      await Promise.resolve(onRefreshData());
+    } catch {
+      setError("Unable to delete thromde.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -164,8 +214,35 @@ export default function LocationManagement({ dzongkhags, thromdes, adminName, on
       <div className="max-h-56 overflow-y-auto space-y-1 text-[11px] text-slate-500">
         {dzongkhags.map((dzongkhag) => (
           <div key={dzongkhag.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-            <span className="font-medium text-slate-700">{dzongkhag.name}</span>
-            <span>{thromdes.filter((thromde) => thromde.dzongkhagId === dzongkhag.id).length} thromdes</span>
+            <div>
+              <div className="font-medium text-slate-700">{dzongkhag.name}</div>
+              <div>{thromdes.filter((thromde) => thromde.dzongkhagId === dzongkhag.id).length} thromdes</div>
+            </div>
+            <button
+              onClick={() => handleDeleteDzongkhag(dzongkhag.id)}
+              disabled={saving}
+              className="text-[11px] font-medium text-red-600 hover:underline disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="max-h-56 overflow-y-auto space-y-1 text-[11px] text-slate-500">
+        {thromdes.map((thromde) => (
+          <div key={thromde.id} className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-200 px-3 py-2">
+            <div>
+              <div className="font-medium text-slate-700">{thromde.name}</div>
+              <div className="text-slate-400">{thromde.id}</div>
+            </div>
+            <button
+              onClick={() => handleDeleteThromde(thromde.id)}
+              disabled={saving}
+              className="text-[11px] font-medium text-red-600 hover:underline disabled:opacity-50"
+            >
+              Delete
+            </button>
           </div>
         ))}
       </div>

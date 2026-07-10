@@ -9,9 +9,12 @@ import {
 } from "./grme-data";
 import {
   FrameworkProposal,
+  FrameworkStorage,
+  appendFrameworkVersion,
+  restoreFrameworkVersion,
   loadFramework,
   cacheFramework,
-  saveFramework,
+  saveFrameworkWithActor,
   loadFrameworkFromApi,
   createProposal,
   applyProposal,
@@ -45,14 +48,61 @@ function normalizeStakeholderAccess(value: string): string[] {
   return Array.from(new Set(requested)).filter(Boolean).slice(0, MAX_STAKEHOLDER_ACCESS);
 }
 
-export function useGRMEFramework() {
+export function useGRMEFramework(adminName?: string) {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [proposals, setProposals] = useState<FrameworkProposal[]>([]);
+  const [versions, setVersions] = useState<FrameworkStorage["versions"]>([]);
+  const [activeVersionId, setActiveVersionId] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const lastRefreshAtRef = useRef<number>(0);
+  const actor = adminName?.trim() || CURRENT_USER;
+
+  const applyFramework = useCallback((fw: FrameworkStorage) => {
+    setDomains(fw.domains);
+    setProposals(fw.proposals);
+    setVersions(fw.versions);
+    setActiveVersionId(fw.activeVersionId);
+  }, []);
+
+  const persistFramework = useCallback(
+    (fw: FrameworkStorage) => {
+      applyFramework(fw);
+      saveFrameworkWithActor(fw, actor);
+    },
+    [actor, applyFramework]
+  );
+
+  const persistVersionedFramework = useCallback(
+    (nextDomains: Domain[], nextProposals: FrameworkProposal[], reason?: string) => {
+      const base: FrameworkStorage = {
+        domains: nextDomains,
+        proposals: nextProposals,
+        versions,
+        activeVersionId,
+        lastUpdated: new Date().toISOString(),
+      };
+      persistFramework(appendFrameworkVersion(base, actor, reason));
+    },
+    [actor, activeVersionId, persistFramework, versions]
+  );
+
+  const restoreFrameworkVersionById = useCallback(
+    (versionId: string, reason?: string) => {
+      if (!versionId || versionId === activeVersionId) return;
+      const base: FrameworkStorage = {
+        domains,
+        proposals,
+        versions,
+        activeVersionId,
+        lastUpdated: new Date().toISOString(),
+      };
+      persistFramework(restoreFrameworkVersion(base, versionId, actor, reason));
+    },
+    [activeVersionId, actor, domains, persistFramework, proposals, versions]
+  );
 
   const refreshFramework = useCallback(async () => {
     if (refreshPromiseRef.current) {
@@ -63,8 +113,7 @@ export function useGRMEFramework() {
     const run = (async () => {
     if (!hasSupabaseConfig) {
       const fw = loadFramework();
-      setDomains(fw.domains);
-      setProposals(fw.proposals);
+      applyFramework(fw);
       lastRefreshAtRef.current = Date.now();
       return;
     }
@@ -73,8 +122,7 @@ export function useGRMEFramework() {
       if (apiFw) {
         const localFw = loadFramework();
         const chosen = (apiFw.lastUpdated || "") >= (localFw.lastUpdated || "") ? apiFw : localFw;
-        setDomains(chosen.domains);
-        setProposals(chosen.proposals);
+        applyFramework(chosen);
         cacheFramework(chosen);
         lastRefreshAtRef.current = Date.now();
       }
@@ -88,7 +136,7 @@ export function useGRMEFramework() {
     });
 
     return refreshPromiseRef.current;
-  }, []);
+  }, [applyFramework]);
 
   const debouncedRefreshFramework = useCallback(() => {
     if (Date.now() - lastRefreshAtRef.current < 30000) return;
@@ -111,8 +159,7 @@ export function useGRMEFramework() {
       if (!hasSupabaseConfig) {
         if (!cancelled) {
           const fw = loadFramework();
-          setDomains(fw.domains);
-          setProposals(fw.proposals);
+          applyFramework(fw);
           lastRefreshAtRef.current = Date.now();
           setLoaded(true);
         }
@@ -122,8 +169,7 @@ export function useGRMEFramework() {
       if (!cancelled) {
         const localFw = loadFramework();
         const chosen = apiFw && (apiFw.lastUpdated || "") >= (localFw.lastUpdated || "") ? apiFw : localFw;
-        setDomains(chosen.domains);
-        setProposals(chosen.proposals);
+        applyFramework(chosen);
         cacheFramework(chosen);
         lastRefreshAtRef.current = Date.now();
       }
@@ -132,7 +178,7 @@ export function useGRMEFramework() {
 
     init();
     return () => { cancelled = true; };
-  }, []);
+  }, [applyFramework]);
 
   // Real-time subscription — auto-refresh when framework changes
   useEffect(() => {
@@ -163,15 +209,15 @@ export function useGRMEFramework() {
 
   const persist = useCallback(
     (newDomains: Domain[], newProposals: FrameworkProposal[]) => {
-      setDomains(newDomains);
-      setProposals(newProposals);
-      saveFramework({
+      persistFramework({
         domains: newDomains,
         proposals: newProposals,
+        versions,
+        activeVersionId,
         lastUpdated: new Date().toISOString(),
       });
     },
-    []
+    [activeVersionId, persistFramework, versions]
   );
 
   // ── Framework CRUD (creates proposals) ──────────────────────
@@ -338,14 +384,9 @@ export function useGRMEFramework() {
         else if (field === "icon") updated.icon = value;
         return updated;
       });
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Updated domain ${domainId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   const updateSubDomainField = useCallback(
@@ -378,14 +419,9 @@ export function useGRMEFramework() {
           }),
         };
       });
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Updated sub-domain ${subId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   const updateIndicatorField = useCallback(
@@ -453,14 +489,9 @@ export function useGRMEFramework() {
           }),
         };
       });
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Updated indicator ${indId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   // ── Direct Add (inline editor) ──────────────────────────────
@@ -470,13 +501,8 @@ export function useGRMEFramework() {
     d.name = "New Domain";
     d.shortName = "New";
     const newDomains = [...domains, d];
-    setDomains(newDomains);
-    saveFramework({
-      domains: newDomains,
-      proposals,
-      lastUpdated: new Date().toISOString(),
-    });
-  }, [domains, proposals]);
+    persistVersionedFramework(newDomains, proposals, "Added domain");
+  }, [domains, persistVersionedFramework, proposals]);
 
   const addSubDomainDirect = useCallback(
     (domainId: string) => {
@@ -485,14 +511,9 @@ export function useGRMEFramework() {
       const newDomains = domains.map((d) =>
         d.id === domainId ? { ...d, subdomains: [...d.subdomains, s] } : d
       );
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Added sub-domain to ${domainId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   const addIndicatorDirect = useCallback(
@@ -509,14 +530,9 @@ export function useGRMEFramework() {
           ),
         };
       });
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Added indicator to ${domainId}/${subId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   // ── Direct Delete (inline editor) ───────────────────────────
@@ -524,14 +540,9 @@ export function useGRMEFramework() {
   const deleteDomainDirect = useCallback(
     (domainId: string) => {
       const newDomains = domains.filter((d) => d.id !== domainId);
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Deleted domain ${domainId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   const deleteSubDomainDirect = useCallback(
@@ -541,14 +552,9 @@ export function useGRMEFramework() {
           ? { ...d, subdomains: d.subdomains.filter((s) => s.id !== subId) }
           : d
       );
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Deleted sub-domain ${subId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   const deleteIndicatorDirect = useCallback(
@@ -564,14 +570,9 @@ export function useGRMEFramework() {
           ),
         };
       });
-      setDomains(newDomains);
-      saveFramework({
-        domains: newDomains,
-        proposals,
-        lastUpdated: new Date().toISOString(),
-      });
+      persistVersionedFramework(newDomains, proposals, `Deleted indicator ${indId}`);
     },
-    [domains, proposals]
+    [domains, persistVersionedFramework, proposals]
   );
 
   // ── Proposal Management ─────────────────────────────────────
@@ -594,9 +595,9 @@ export function useGRMEFramework() {
         p.id === proposalId ? approved : p
       );
 
-      persist(newDomains, newProposals);
+      persistVersionedFramework(newDomains, newProposals, `Approved proposal ${proposalId}`);
     },
-    [domains, proposals, persist]
+    [domains, persistVersionedFramework, proposals]
   );
 
   const rejectProposal = useCallback(
@@ -616,9 +617,15 @@ export function useGRMEFramework() {
         p.id === proposalId ? rejected : p
       );
 
-      persist(domains, newProposals);
+      persistFramework({
+        domains,
+        proposals: newProposals,
+        versions,
+        activeVersionId,
+        lastUpdated: new Date().toISOString(),
+      });
     },
-    [domains, proposals, persist]
+    [activeVersionId, domains, persistFramework, proposals, versions]
   );
 
   // ── Direct Apply (for immediate use, bypassing proposal) ────
@@ -640,9 +647,9 @@ export function useGRMEFramework() {
         p.id === proposalId ? approved : p
       );
 
-      persist(newDomains, newProposals);
+      persistVersionedFramework(newDomains, newProposals, `Applied proposal ${proposalId}`);
     },
-    [domains, proposals, persist]
+    [domains, persistVersionedFramework, proposals]
   );
 
   // ── Reset to Defaults ──────────────────────────────────────
@@ -651,10 +658,8 @@ export function useGRMEFramework() {
     // Force reload from defaults
     localStorage.removeItem("grme-framework");
     const fresh = loadFramework();
-    setDomains(fresh.domains);
-    setProposals(fresh.proposals);
-    saveFramework(fresh);
-  }, []);
+    persistFramework(fresh);
+  }, [persistFramework]);
 
   // ── Helpers ─────────────────────────────────────────────────
 
@@ -676,6 +681,8 @@ export function useGRMEFramework() {
   return {
     domains,
     proposals,
+    versions,
+    activeVersionId,
     pendingProposals,
     reviewedProposals,
     loaded,
@@ -699,6 +706,7 @@ export function useGRMEFramework() {
     approveProposal,
     rejectProposal,
     applyNow,
+    restoreFrameworkVersionById,
 
     // Utils
     resetFramework,

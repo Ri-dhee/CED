@@ -68,12 +68,12 @@ function GRMEApp({
   user,
   onSwitchRole,
   onLogout,
-}: {
+  }: {
   user: GrmeUser;
   onSwitchRole: (role: "admin" | "editor" | "viewer") => void;
   onLogout: () => void;
 }) {
-  const framework = useGRMEFramework();
+  const framework = useGRMEFramework(user.name);
   const { trackSync, onRetryAll } = useSync();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -1015,6 +1015,8 @@ function GRMEApp({
             </div>
             <FrameworkEditor
               domains={framework.domains}
+              versions={framework.versions}
+              activeVersionId={framework.activeVersionId}
               pendingProposals={framework.pendingProposals}
               reviewedProposals={framework.reviewedProposals}
               onUpdateDomain={framework.updateDomainField}
@@ -1028,6 +1030,7 @@ function GRMEApp({
               onDeleteIndicator={framework.deleteIndicatorDirect}
               onApprove={framework.approveProposal}
               onReject={framework.rejectProposal}
+              onRestoreVersion={framework.restoreFrameworkVersionById}
             />
           </div>
         </section>

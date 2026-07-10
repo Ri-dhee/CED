@@ -274,7 +274,7 @@ export function useManagedUsers() {
   const updateUser = useCallback(
     (
       id: string,
-      updates: Partial<Pick<ManagedUser, "name" | "role" | "active" | "stakeholderId" | "dzongkhagId" | "thromdeId">>
+      updates: Partial<Pick<ManagedUser, "name" | "role" | "active" | "stakeholderId" | "dzongkhagId" | "thromdeId" | "allowedDomainIds" | "allowedIndicatorIds" | "allowedDzongkhagIds" | "allowedThromdeIds">>
     ): void => {
       const existing = loadUsers();
       const updated = existing.map((u) =>

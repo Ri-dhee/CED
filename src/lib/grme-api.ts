@@ -159,9 +159,23 @@ export async function saveDzongkhagsConfig(dzongkhags: Array<{ id: string; name:
   await saveConfigValue("dzongkhags", JSON.stringify(payload));
 }
 
+export async function deleteDzongkhag(id: string): Promise<void> {
+  await withWriteRetry("deleteDzongkhagThromdes", async () => {
+    const { error } = await supabase()
+      .from("thromdes")
+      .delete()
+      .eq("dzongkhag_id", id);
+    if (error) throw error;
+  });
+
+  const existing = await loadDzongkhagsConfig();
+  const next = existing.filter((dzongkhag) => dzongkhag.id !== id);
+  await saveDzongkhagsConfig(next);
+}
+
 export async function recordAdminEvent(params: {
   actor: string;
-  action: "create" | "update" | "review";
+  action: "create" | "update" | "delete" | "review";
   entity: string;
   notes: string;
 }): Promise<void> {

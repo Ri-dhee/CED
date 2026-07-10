@@ -230,6 +230,18 @@ export function useGrmeUser() {
   const [user, setUser] = useState<GrmeUser | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/grme/session", { credentials: "include" });
+      if (!res.ok) return;
+      const json = await res.json().catch(() => ({}));
+      const next = normalizeUser(json.user);
+      setUser(next);
+    } catch {
+      // Keep current session state if refresh fails.
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -247,6 +259,22 @@ export function useGrmeUser() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      refreshUser();
+    };
+
+    const timer = window.setInterval(() => {
+      refreshUser();
+    }, 30000);
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.clearInterval(timer);
+    };
+  }, [refreshUser]);
 
   const login = useCallback(async (name: string, role: UserRole, password?: string, scope?: UserScope) => {
     const result = await saveSessionUser(name.trim(), role, password, scope);

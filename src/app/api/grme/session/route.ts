@@ -80,6 +80,30 @@ function getExistingSession(request: Request): GrmeSessionUser | null {
   return token ? decodeSession(token) : null;
 }
 
+async function hydrateManagedUserSession(session: GrmeSessionUser | null): Promise<GrmeSessionUser | null> {
+  if (!session || session.role === "admin") return session;
+  if (!hasSupabaseConfig) return session;
+
+  const users = await api.loadUsers().catch(() => []);
+  const found = users.find((u) => u.name.toLowerCase() === session.name.toLowerCase() && u.active);
+  if (!found) return null;
+
+  return {
+    name: found.name,
+    role: found.role,
+    loginAt: session.loginAt,
+    scope: {
+      dzongkhagId: found.dzongkhagId,
+      thromdeId: found.thromdeId,
+      stakeholderId: found.stakeholderId,
+    },
+    allowedDomainIds: found.allowedDomainIds || [],
+    allowedIndicatorIds: found.allowedIndicatorIds || [],
+    allowedDzongkhagIds: found.allowedDzongkhagIds || [],
+    allowedThromdeIds: found.allowedThromdeIds || [],
+  };
+}
+
 async function verifyLogin(
   name: string,
   role: UserRole,
@@ -148,7 +172,7 @@ async function verifyLogin(
 // ── Route handlers ───────────────────────────────────────────────
 
 export async function GET(request: Request) {
-  const user = getExistingSession(request);
+  const user = await hydrateManagedUserSession(getExistingSession(request));
   return NextResponse.json({ user: user || null });
 }
 

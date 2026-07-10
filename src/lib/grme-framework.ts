@@ -32,9 +32,20 @@ export interface FrameworkProposal {
   reviewNotes?: string;
 }
 
+export interface FrameworkVersion {
+  id: string;
+  label: string;
+  timestamp: string;
+  domains: Domain[];
+  createdBy?: string;
+  reason?: string;
+}
+
 export interface FrameworkStorage {
   domains: Domain[];
   proposals: FrameworkProposal[];
+  versions: FrameworkVersion[];
+  activeVersionId: string;
   lastUpdated: string;
 }
 
@@ -125,14 +136,73 @@ function isProposal(value: unknown): value is FrameworkProposal {
   );
 }
 
+function isFrameworkVersion(value: unknown): value is FrameworkVersion {
+  if (!isObject(value)) return false;
+  const version = value as Record<string, unknown>;
+  return (
+    typeof version.id === "string" &&
+    typeof version.label === "string" &&
+    typeof version.timestamp === "string" &&
+    Array.isArray(version.domains) &&
+    version.domains.every(isDomain) &&
+    (version.createdBy === undefined || typeof version.createdBy === "string") &&
+    (version.reason === undefined || typeof version.reason === "string")
+  );
+}
+
+function createFrameworkVersion(
+  domains: Domain[],
+  index: number,
+  createdBy?: string,
+  reason?: string
+): FrameworkVersion {
+  return {
+    id: `v${index}`,
+    label: `v${index}`,
+    timestamp: new Date().toISOString(),
+    domains: deepClone(domains),
+    createdBy,
+    reason,
+  };
+}
+
+function getNextFrameworkVersionIndex(versions: FrameworkVersion[]): number {
+  const maxIndex = versions.reduce((max, version) => {
+    const match = /^v(\d+)$/.exec(version.id) || /^v(\d+)$/.exec(version.label);
+    if (!match) return max;
+    return Math.max(max, Number(match[1]));
+  }, 0);
+  return maxIndex + 1;
+}
+
+function cloneFrameworkStorage(fw: FrameworkStorage): FrameworkStorage {
+  return deepClone(fw);
+}
+
+export function getFrameworkVersionLabel(index: number): string {
+  return `v${index}`;
+}
+
 function sanitizeFrameworkStorage(value: unknown): FrameworkStorage | null {
   if (!isObject(value)) return null;
   if (!Array.isArray(value.domains) || !Array.isArray(value.proposals)) return null;
   if (!value.domains.every(isDomain)) return null;
+  const versions = Array.isArray(value.versions)
+    ? value.versions.filter(isFrameworkVersion)
+    : [];
+  const normalizedVersions = versions.length > 0
+    ? versions
+    : [createFrameworkVersion(value.domains, 1)];
+  const activeVersionId = typeof value.activeVersionId === "string" && normalizedVersions.some((version) => version.id === value.activeVersionId)
+    ? value.activeVersionId
+    : normalizedVersions[normalizedVersions.length - 1].id;
+  const activeVersion = normalizedVersions.find((version) => version.id === activeVersionId) || normalizedVersions[normalizedVersions.length - 1];
   return {
-    domains: value.domains,
+    domains: deepClone(activeVersion.domains),
     proposals: value.proposals.filter(isProposal),
-    lastUpdated: typeof value.lastUpdated === "string" ? value.lastUpdated : new Date().toISOString(),
+    versions: normalizedVersions,
+    activeVersionId,
+    lastUpdated: typeof value.lastUpdated === "string" ? value.lastUpdated : activeVersion.timestamp,
   };
 }
 
@@ -172,7 +242,7 @@ export function generateEntityId(prefix: string): string {
 
 export function loadFramework(): FrameworkStorage {
   if (typeof window === "undefined") {
-    return { domains: [], proposals: [], lastUpdated: "" };
+    return { domains: [], proposals: [], versions: [], activeVersionId: "", lastUpdated: "" };
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -194,6 +264,8 @@ export function loadFramework(): FrameworkStorage {
   const seed: FrameworkStorage = {
     domains: getDefaultFramework(),
     proposals: [],
+    versions: [createFrameworkVersion(getDefaultFramework(), 1)],
+    activeVersionId: "v1",
     lastUpdated: new Date().toISOString(),
   };
   cacheFramework(seed);
@@ -206,6 +278,56 @@ export function saveFramework(fw: FrameworkStorage): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   // Sync to API (fire-and-forget)
   api.saveFramework(saved).catch(() => {});
+}
+
+export function saveFrameworkWithActor(fw: FrameworkStorage, actor?: string): void {
+  if (typeof window === "undefined") return;
+  const saved = { ...fw, lastUpdated: new Date().toISOString() };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  api.saveFramework(saved, actor).catch(() => {});
+}
+
+export function appendFrameworkVersion(
+  fw: FrameworkStorage,
+  createdBy?: string,
+  reason?: string
+): FrameworkStorage {
+  const nextVersion = createFrameworkVersion(
+    fw.domains,
+    getNextFrameworkVersionIndex(fw.versions),
+    createdBy,
+    reason
+  );
+  return {
+    ...cloneFrameworkStorage(fw),
+    domains: deepClone(fw.domains),
+    versions: [...fw.versions, nextVersion],
+    activeVersionId: nextVersion.id,
+  };
+}
+
+export function restoreFrameworkVersion(
+  fw: FrameworkStorage,
+  versionId: string,
+  createdBy?: string,
+  reason?: string
+): FrameworkStorage {
+  const target = fw.versions.find((version) => version.id === versionId);
+  if (!target) return fw;
+
+  const nextVersion = createFrameworkVersion(
+    target.domains,
+    getNextFrameworkVersionIndex(fw.versions),
+    createdBy,
+    reason || `Restored from ${target.label}`
+  );
+
+  return {
+    ...cloneFrameworkStorage(fw),
+    domains: deepClone(target.domains),
+    versions: [...fw.versions, nextVersion],
+    activeVersionId: nextVersion.id,
+  };
 }
 
 export function cacheFramework(fw: FrameworkStorage): void {

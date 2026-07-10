@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   useManagedUsers,
 } from "@/lib/grme-managed-users";
@@ -8,7 +8,12 @@ import {
   UserRole,
   ROLE_LABELS,
   ROLE_COLORS,
+  canAccessDzongkhag,
+  canAccessIndicator,
+  canAccessThromde,
 } from "@/lib/grme-user";
+import type { GrmeUser } from "@/lib/grme-user";
+import type { ManagedUser } from "@/lib/grme-managed-users";
 import { Domain, STAKEHOLDERS, Thromde } from "@/lib/grme-data";
 import { DataEntryWindowConfig } from "@/lib/grme-user";
 import { recordAdminEvent, saveDataEntryWindowConfig } from "@/lib/grme-api";
@@ -33,6 +38,83 @@ function toLocalInputValue(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return "";
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function listOrNone(items: string[]): string {
+  return items.length > 0 ? items.join(", ") : "None";
+}
+
+function getIndicatorLabel(indicator: { id: string; name: string }): string {
+  return `${indicator.name}`;
+}
+
+function getUserAccessSummary(
+  user: ManagedUser,
+  domains: Domain[],
+  dzongkhags: { id: string; name: string }[],
+  thromdes: Thromde[]
+) {
+  const accessUser: GrmeUser = {
+    name: user.name,
+    role: user.role,
+    loginAt: user.lastLoginAt || user.createdAt,
+    scope: {
+      dzongkhagId: user.dzongkhagId,
+      thromdeId: user.thromdeId,
+      stakeholderId: user.stakeholderId,
+    },
+    allowedDomainIds: user.allowedDomainIds,
+    allowedIndicatorIds: user.allowedIndicatorIds,
+    allowedDzongkhagIds: user.allowedDzongkhagIds,
+    allowedThromdeIds: user.allowedThromdeIds,
+  };
+
+  if (user.role === "admin") {
+    return {
+      canEdit: true,
+      domains: domains.map((domain) => domain.name),
+      indicators: domains.flatMap((domain) =>
+        domain.subdomains.flatMap((subdomain) => subdomain.indicators.map((indicator) => getIndicatorLabel(indicator)))
+      ),
+      dzongkhags: dzongkhags.map((item) => item.name),
+      thromdes: thromdes.map((item) => item.name),
+      note: "Full access to all app objects",
+    };
+  }
+
+  const allIndicators = domains.flatMap((domain) =>
+    domain.subdomains.flatMap((subdomain) => subdomain.indicators)
+  );
+
+  const accessibleDomains = domains
+    .filter((domain) =>
+      (user.allowedDomainIds || []).includes(domain.id) ||
+      domain.subdomains.some((subdomain) =>
+        subdomain.indicators.some((indicator) => canAccessIndicator(accessUser, indicator, domains))
+      )
+    )
+    .map((domain) => domain.name);
+
+  const accessibleIndicators = allIndicators
+    .filter((indicator) => canAccessIndicator(accessUser, indicator, domains))
+    .map((indicator) => indicator.name);
+
+  const accessibleDzongkhags = dzongkhags
+    .filter((dzongkhag) => canAccessDzongkhag(accessUser, dzongkhag.id, thromdes))
+    .map((dzongkhag) => dzongkhag.name);
+
+  const accessibleThromdes = thromdes
+    .filter((thromde) => canAccessThromde(accessUser, thromde.id, thromdes))
+    .map((thromde) => thromde.name);
+
+  return {
+    canEdit: false,
+    domains: accessibleDomains,
+    indicators: accessibleIndicators,
+    dzongkhags: accessibleDzongkhags,
+    thromdes: accessibleThromdes,
+    note: user.role === "viewer" ? "View-only role" : "Effective edit access",
+  };
 }
 
 export default function UserManagement({ onClose, dataEntryWindow, adminEvents, adminName, onRefreshData, domains, dzongkhags, thromdes }: UserManagementProps) {
@@ -60,6 +142,10 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
   const [editStakeholder, setEditStakeholder] = useState("planning");
   const [editDzongkhag, setEditDzongkhag] = useState("");
   const [editThromde, setEditThromde] = useState("");
+  const [editAllowedDomainIds, setEditAllowedDomainIds] = useState<string[]>([]);
+  const [editAllowedIndicatorIds, setEditAllowedIndicatorIds] = useState<string[]>([]);
+  const [editAllowedDzongkhagIds, setEditAllowedDzongkhagIds] = useState<string[]>([]);
+  const [editAllowedThromdeIds, setEditAllowedThromdeIds] = useState<string[]>([]);
   const [showPasswordField, setShowPasswordField] = useState<string | null>(null);
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -143,7 +229,17 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
 
   const handleUpdate = (id: string) => {
     if (!editName.trim()) return;
-    updateUser(id, { name: editName.trim(), role: editRole, stakeholderId: editStakeholder, dzongkhagId: editDzongkhag, thromdeId: editThromde || null });
+    updateUser(id, {
+      name: editName.trim(),
+      role: editRole,
+      stakeholderId: editStakeholder,
+      dzongkhagId: editDzongkhag,
+      thromdeId: editThromde || null,
+      allowedDomainIds: editAllowedDomainIds,
+      allowedIndicatorIds: editAllowedIndicatorIds,
+      allowedDzongkhagIds: editAllowedDzongkhagIds,
+      allowedThromdeIds: editAllowedThromdeIds,
+    });
     setEditingUser(null);
   };
 
@@ -211,6 +307,16 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
 
   const activeUsers = users.filter((u) => u.active);
   const inactiveUsers = users.filter((u) => !u.active);
+  const accessSummaries = useMemo(
+    () =>
+      new Map(
+        users.map((user) => [
+          user.id,
+          getUserAccessSummary(user, domains, dzongkhags, thromdes),
+        ])
+      ),
+    [domains, dzongkhags, thromdes, users]
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -555,6 +661,7 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       {isEditing ? (
+                        <>
                         <div className="flex items-center gap-2">
                           <input
                             id={`grme-user-edit-name-${user.id}`}
@@ -588,19 +695,97 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                             <option value="">None</option>
                             {thromdes.filter((t) => t.dzongkhagId === editDzongkhag).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                           </select>
-                          <button
-                            onClick={() => handleUpdate(user.id)}
-                            className="text-xs text-primary font-medium hover:underline"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingUser(null)}
-                            className="text-xs text-gray-400 hover:underline"
-                          >
-                            Cancel
-                          </button>
                         </div>
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Access toggles</h4>
+                              <p className="text-[11px] text-slate-400">Switch any permission on or off for this user.</p>
+                            </div>
+                            <span className="text-[11px] text-slate-400">Synced live after save</span>
+                          </div>
+                          <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                            <div>
+                              <div className="text-[11px] font-medium text-slate-500 mb-2">Dzongkhags</div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {dzongkhags.map((city) => (
+                                  <label key={city.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={editAllowedDzongkhagIds.includes(city.id)}
+                                      onChange={() => toggleSelection(city.id, editAllowedDzongkhagIds, setEditAllowedDzongkhagIds)}
+                                    />
+                                    <span>{city.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-[11px] font-medium text-slate-500 mb-2">Thromdes</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {thromdes.map((thromde) => (
+                                  <label key={thromde.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={editAllowedThromdeIds.includes(thromde.id)}
+                                      onChange={() => toggleSelection(thromde.id, editAllowedThromdeIds, setEditAllowedThromdeIds)}
+                                    />
+                                    <span>{thromde.name}</span>
+                                    <span className="text-[10px] text-slate-400 ml-auto">{dzongkhags.find((c) => c.id === thromde.dzongkhagId)?.name || thromde.dzongkhagId}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-[11px] font-medium text-slate-500 mb-2">Domains and indicators</div>
+                              <div className="space-y-2">
+                                {domains.map((domain) => (
+                                  <div key={domain.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <label className="flex items-center gap-2 text-xs font-medium text-slate-800">
+                                      <input
+                                        type="checkbox"
+                                        checked={editAllowedDomainIds.includes(domain.id)}
+                                        onChange={() => toggleSelection(domain.id, editAllowedDomainIds, setEditAllowedDomainIds)}
+                                      />
+                                      <span>{domain.shortName}</span>
+                                      <span className="text-slate-400 font-normal">{domain.name}</span>
+                                    </label>
+                                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                      {domain.subdomains.flatMap((subdomain) => subdomain.indicators).map((indicator) => (
+                                        <label key={indicator.id} className="flex items-start gap-2 rounded-lg bg-white border border-slate-200 px-2 py-1.5 text-[11px] text-slate-700">
+                                          <input
+                                            type="checkbox"
+                                            className="mt-0.5"
+                                            checked={editAllowedIndicatorIds.includes(indicator.id)}
+                                            onChange={() => toggleSelection(indicator.id, editAllowedIndicatorIds, setEditAllowedIndicatorIds)}
+                                          />
+                                          <span>{indicator.name}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleUpdate(user.id)}
+                              className="text-xs text-white bg-primary px-3 py-1.5 rounded-lg font-medium hover:bg-primary-dark"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingUser(null)}
+                              className="text-xs text-gray-400 hover:underline"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                        </>
                       ) : (
                         <>
                           <div className="flex items-center gap-2">
@@ -614,14 +799,26 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                               {ROLE_LABELS[user.role]}
                             </span>
                           </div>
-                          <div className="text-[11px] text-gray-400 mt-0.5">
-                            {user.lastLoginAt
-                              ? `Last login: ${new Date(user.lastLoginAt).toLocaleDateString()}`
-                              : "Never logged in"}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">
+                        {user.lastLoginAt
+                          ? `Last login: ${new Date(user.lastLoginAt).toLocaleDateString()}`
+                          : "Never logged in"}
+                      </div>
+                      <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold uppercase tracking-wider text-slate-500">Access</span>
+                          <span className="text-slate-400">{accessSummaries.get(user.id)?.note || ""}</span>
+                        </div>
+                        <div className="mt-1 space-y-1">
+                          <div><span className="text-slate-400">Domains:</span> {listOrNone(accessSummaries.get(user.id)?.domains || [])}</div>
+                          <div><span className="text-slate-400">Indicators:</span> {listOrNone(accessSummaries.get(user.id)?.indicators || [])}</div>
+                          <div><span className="text-slate-400">Dzongkhags:</span> {listOrNone(accessSummaries.get(user.id)?.dzongkhags || [])}</div>
+                          <div><span className="text-slate-400">Thromdes:</span> {listOrNone(accessSummaries.get(user.id)?.thromdes || [])}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                     {/* Actions */}
                     {!isEditing && !isChangingPass && (
@@ -634,6 +831,10 @@ export default function UserManagement({ onClose, dataEntryWindow, adminEvents, 
                             setEditStakeholder(user.stakeholderId || "planning");
                             setEditDzongkhag(user.dzongkhagId || "thimphu");
                             setEditThromde(user.thromdeId || "");
+                            setEditAllowedDomainIds(user.allowedDomainIds || []);
+                            setEditAllowedIndicatorIds(user.allowedIndicatorIds || []);
+                            setEditAllowedDzongkhagIds(user.allowedDzongkhagIds || []);
+                            setEditAllowedThromdeIds(user.allowedThromdeIds || []);
                           }}
                           className="p-1.5 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
                           title="Edit user"
